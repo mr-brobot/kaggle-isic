@@ -1,0 +1,33 @@
+{
+    "name": "AI",
+    "image": "mcr.microsoft.com/devcontainers/base:bullseye",
+    "hostRequirements": {
+        "gpu": "optional"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "github.copilot",
+                "github.copilot-chat",
+                "github.vscode-github-actions",
+                "redhat.vscode-yaml",
+                "esbenp.prettier-vscode",
+                "ms-toolsai.jupyter",
+                "ms-toolsai.vscode-jupyter-powertoys"
+            ]
+        }
+    },
+    "remoteUser": "vscode",
+    "postCreateCommand": "scripts/setup.sh",
+    "features": {
+        "ghcr.io/devcontainers/features/python:1": {
+            "version": "3.12"
+        },
+        "ghcr.io/devcontainers/features/nvidia-cuda:1": {
+            "installCudnn": true,
+            "installCudnnDev": true,
+            "installNvtx": true,
+            "installToolkit": true
+        }
+    }
+}
