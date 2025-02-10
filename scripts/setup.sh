@@ -8,7 +8,7 @@ pip install ipywidgets
 pip install matplotlib
 
 # https://pytorch.org/
-pip install torch torchvision
+pip install torch torchvision torcharrow
 
 # wandb
 pip install wandb
@@ -18,4 +18,5 @@ pip install kaggle
 
 pip install h5py
 pip install pillow
+pip install scikit-learn
 pip install pandas pyarrow numpy
