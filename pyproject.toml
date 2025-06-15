@@ -1,7 +1,7 @@
 [project]
 name = "isic"
 version = "0.1.0"
-description = "Add your description here"
+description = "https://www.kaggle.com/competitions/isic-2024-challenge"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
