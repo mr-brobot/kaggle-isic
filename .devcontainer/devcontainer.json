@@ -9,7 +9,6 @@
             "extensions": [
                 "github.copilot",
                 "github.copilot-chat",
-                "github.vscode-github-actions",
                 "redhat.vscode-yaml",
                 "esbenp.prettier-vscode",
                 "ms-toolsai.jupyter",
@@ -17,12 +16,24 @@
             ]
         }
     },
+    "mounts": [
+        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached",
+    ],
+    "containerEnv": {
+        "AWS_REGION": "us-west-2",
+        "CLAUDE_CODE_USE_BEDROCK": "1",
+        "ANTHROPIC_MODEL": "us.anthropic.claude-sonnet-4-20250514-v1:0",
+        "DISABLE_PROMPT_CACHING": "1"
+    },
     "remoteUser": "vscode",
-    "postCreateCommand": "scripts/setup.sh",
     "features": {
         "ghcr.io/devcontainers/features/python:1": {
             "version": "3.12"
         },
+        "ghcr.io/va-h/devcontainers-features/uv:1": {},
+        "ghcr.io/devcontainers-extra/features/ruff:1": {},
+        "ghcr.io/devcontainers/features/aws-cli:1": {},
+        "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
         "ghcr.io/devcontainers/features/nvidia-cuda:1": {
             "installCudnn": true,
             "installCudnnDev": true,
