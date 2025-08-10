@@ -178,3 +178,7 @@ data/*
 
 # claude
 .claude
+.mcp.json
+
+# mlflow
+mlruns/*
