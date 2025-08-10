@@ -4,7 +4,7 @@ https://www.kaggle.com/competitions/isic-2024-challenge
 
 ## Development
 
-1. Set up Kaggle API key
+1. Configure Kaggle API key
 
 https://www.kaggle.com/docs/api#getting-started-installation-&-authentication
 
