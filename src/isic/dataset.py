@@ -19,22 +19,27 @@ class MetadataPreprocessor:
     Classifies each column and applies appropriate scaling and encoding.
     """
 
-    def __init__(self,
-                 numerical_features: Optional[List[str]] = None,
-                 categorical_features: Optional[List[str]] = None,
-                 excluded_features: Optional[List[str]] = None):
+    def __init__(
+        self,
+        numerical_features: Optional[List[str]] = None,
+        categorical_features: Optional[List[str]] = None,
+        excluded_features: Optional[List[str]] = None,
+    ):
         """
         Initialize preprocessor with feature specifications.
 
         Args:
             numerical_features: List of numerical column names to include
-            categorical_features: List of categorical column names to include  
+            categorical_features: List of categorical column names to include
             excluded_features: List of column names to exclude from preprocessing
         """
         self.numerical_features = numerical_features or []
         self.categorical_features = categorical_features or []
         self.excluded_features = excluded_features or [
-            'isic_id', 'target', 'patient_id']
+            "isic_id",
+            "target",
+            "patient_id",
+        ]
 
         # Preprocessing components
         self.numerical_scaler = StandardScaler()
@@ -51,20 +56,21 @@ class MetadataPreprocessor:
         if not self.numerical_features and not self.categorical_features:
             # Get all columns except excluded ones
             available_cols = [
-                col for col in df.columns if col not in self.excluded_features]
+                col for col in df.columns if col not in self.excluded_features
+            ]
 
             # Auto-detect based on dtype
             for col in available_cols:
-                if df[col].dtype in ['int64', 'float64']:
+                if df[col].dtype in ["int64", "float64"]:
                     # Check if it's actually categorical (few unique values)
-                    if df[col].nunique() <= 10 and col != 'age_approx':
+                    if df[col].nunique() <= 10 and col != "age_approx":
                         self.categorical_features.append(col)
                     else:
                         self.numerical_features.append(col)
                 else:
                     self.categorical_features.append(col)
 
-    def fit(self, df: pd.DataFrame) -> 'MetadataPreprocessor':
+    def fit(self, df: pd.DataFrame) -> "MetadataPreprocessor":
         """
         Fit preprocessor on training data.
 
@@ -80,34 +86,37 @@ class MetadataPreprocessor:
         self._auto_detect_features(df)
 
         print(
-            f"Preprocessing {len(self.numerical_features)} numerical and {len(self.categorical_features)} categorical features")
+            f"Preprocessing {len(self.numerical_features)} numerical and {len(self.categorical_features)} categorical features"
+        )
         print(
-            f"Numerical: {self.numerical_features[:5]}{'...' if len(self.numerical_features) > 5 else ''}")
+            f"Numerical: {self.numerical_features[:5]}{'...' if len(self.numerical_features) > 5 else ''}"
+        )
         print(
-            f"Categorical: {self.categorical_features[:5]}{'...' if len(self.categorical_features) > 5 else ''}")
+            f"Categorical: {self.categorical_features[:5]}{'...' if len(self.categorical_features) > 5 else ''}"
+        )
 
         # Fit numerical scaler
         if self.numerical_features:
-            numerical_data = df[self.numerical_features].fillna(
-                0)  # Fill NaN with 0
+            numerical_data = df[self.numerical_features].fillna(0)  # Fill NaN with 0
             self.numerical_scaler.fit(numerical_data)
 
         # Fit categorical encoders
         for feature in self.categorical_features:
             if feature in df.columns:
                 # Fill NaN with 'unknown' for categorical features
-                data = df[feature].fillna('unknown').astype(str)
+                data = df[feature].fillna("unknown").astype(str)
 
                 # Use LabelEncoder for high cardinality, OneHotEncoder for low cardinality
                 if data.nunique() <= 10:
                     encoder = OneHotEncoder(
-                        handle_unknown='ignore', sparse_output=False)
+                        handle_unknown="ignore", sparse_output=False
+                    )
                     encoder.fit(data.values.reshape(-1, 1))
-                    self.categorical_encoders[feature] = ('onehot', encoder)
+                    self.categorical_encoders[feature] = ("onehot", encoder)
                 else:
                     encoder = LabelEncoder()
                     encoder.fit(data)
-                    self.categorical_encoders[feature] = ('label', encoder)
+                    self.categorical_encoders[feature] = ("label", encoder)
 
         # Calculate output dimension
         self._calculate_output_dim()
@@ -121,7 +130,7 @@ class MetadataPreprocessor:
 
         # Add categorical feature dimensions
         for feature, (encoder_type, encoder) in self.categorical_encoders.items():
-            if encoder_type == 'onehot':
+            if encoder_type == "onehot":
                 dim += encoder.categories_[0].shape[0]
             else:  # label encoder
                 dim += 1
@@ -154,10 +163,10 @@ class MetadataPreprocessor:
         # Handle categorical features
         for feature in self.categorical_features:
             if feature in df.columns:
-                data = df[feature].fillna('unknown').astype(str)
+                data = df[feature].fillna("unknown").astype(str)
                 encoder_type, encoder = self.categorical_encoders[feature]
 
-                if encoder_type == 'onehot':
+                if encoder_type == "onehot":
                     encoded = encoder.transform(data.values.reshape(-1, 1))
                     features.append(encoded)
                 else:  # label encoder
@@ -195,6 +204,7 @@ class ISICDataset(Dataset):
     @cache
     def image(self, key: str) -> Image:
         from PIL import Image
+
         with h5py.File(self.hdf5_path) as f:
             b = io.BytesIO(f[key][()])
             return Image.open(b)
@@ -204,8 +214,7 @@ class ISICDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Tuple[pd.Series, Image, int]:
         if type(idx) is not int:
-            raise ValueError(
-                f"ISICDataset: Unexpected index type {idx} ({type(idx)})")
+            raise ValueError(f"ISICDataset: Unexpected index type {idx} ({type(idx)})")
 
         # ensure int for pandas compat
         idx = int(idx)
@@ -217,9 +226,9 @@ class ISICDataset(Dataset):
         return row, image, row["target"]
 
 
-def create_train_val_splits(metadata_df: pd.DataFrame,
-                            val_size: float = 0.2,
-                            random_state: int = 42) -> Tuple[List[int], List[int]]:
+def create_train_val_splits(
+    metadata_df: pd.DataFrame, val_size: float = 0.2, random_state: int = 42
+) -> Tuple[List[int], List[int]]:
     """
     Create stratified train/validation splits.
 
@@ -235,26 +244,23 @@ def create_train_val_splits(metadata_df: pd.DataFrame,
 
     # Create stratified split
     indices = np.arange(len(metadata_df))
-    targets = metadata_df['target'].values
+    targets = metadata_df["target"].values
 
     train_idx, val_idx = train_test_split(
-        indices,
-        test_size=val_size,
-        stratify=targets,
-        random_state=random_state
+        indices, test_size=val_size, stratify=targets, random_state=random_state
     )
 
     print(f"Train samples: {len(train_idx)}")
     print(f"Validation samples: {len(val_idx)}")
-    print(
-        f"Train malignant rate: {metadata_df.iloc[train_idx]['target'].mean():.4f}")
-    print(
-        f"Val malignant rate: {metadata_df.iloc[val_idx]['target'].mean():.4f}")
+    print(f"Train malignant rate: {metadata_df.iloc[train_idx]['target'].mean():.4f}")
+    print(f"Val malignant rate: {metadata_df.iloc[val_idx]['target'].mean():.4f}")
 
     return train_idx.tolist(), val_idx.tolist()
 
 
-def create_weighted_sampler(dataset: ISICDataset) -> torch.utils.data.WeightedRandomSampler:
+def create_weighted_sampler(
+    dataset: ISICDataset,
+) -> torch.utils.data.WeightedRandomSampler:
     """
     Create weighted sampler for handling class imbalance.
 
@@ -264,7 +270,7 @@ def create_weighted_sampler(dataset: ISICDataset) -> torch.utils.data.WeightedRa
     Returns:
         WeightedRandomSampler for balanced sampling
     """
-    targets = dataset.metadata['target'].values
+    targets = dataset.metadata["target"].values
     class_counts = np.bincount(targets.astype(int))
     class_weights = 1.0 / class_counts
     sample_weights = class_weights[targets.astype(int)]
@@ -273,7 +279,5 @@ def create_weighted_sampler(dataset: ISICDataset) -> torch.utils.data.WeightedRa
     print(f"Class weights: {class_weights}")
 
     return torch.utils.data.WeightedRandomSampler(
-        weights=sample_weights,
-        num_samples=len(sample_weights),
-        replacement=True
+        weights=sample_weights, num_samples=len(sample_weights), replacement=True
     )

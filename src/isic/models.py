@@ -12,7 +12,7 @@ class MLP(nn.Module):
 
         self.flatten = nn.Flatten(1, -1)  # (B, H, W, 3) -> (B, 128*128*3)
         self.image_stack = nn.Sequential(
-            nn.Linear(h*w*3, 128),  # (B, H*W*3) -> (B, 128)
+            nn.Linear(h * w * 3, 128),  # (B, H*W*3) -> (B, 128)
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
@@ -53,12 +53,14 @@ class CNNMLPBaseline(nn.Module):
     - Fusion: Concatenation + final classification layers
     """
 
-    def __init__(self,
-                 metadata_dim: int,
-                 backbone_name: str = 'efficientnet_b2',
-                 pretrained: bool = True,
-                 dropout_rate: float = 0.5,
-                 hidden_dim: int = 256):
+    def __init__(
+        self,
+        metadata_dim: int,
+        backbone_name: str = "efficientnet_b2",
+        pretrained: bool = True,
+        dropout_rate: float = 0.5,
+        hidden_dim: int = 256,
+    ):
         """
         Initialize CNN+MLP baseline model.
 
@@ -80,7 +82,7 @@ class CNNMLPBaseline(nn.Module):
         self.backbone = timm.create_model(
             backbone_name,
             pretrained=pretrained,
-            num_classes=0  # Remove classification head
+            num_classes=0,  # Remove classification head
         )
 
         # Get backbone output dimension
@@ -119,12 +121,11 @@ class CNNMLPBaseline(nn.Module):
             nn.ReLU(),
             nn.Dropout(dropout_rate // 2),
             nn.Linear(hidden_dim // 2, 1),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
         print(f"Fusion input dim: {fusion_input_dim}")
-        print(
-            f"Model parameters: {sum(p.numel() for p in self.parameters()):,}")
+        print(f"Model parameters: {sum(p.numel() for p in self.parameters()):,}")
 
     def forward(self, images: torch.Tensor, metadata: torch.Tensor) -> torch.Tensor:
         """
@@ -144,8 +145,7 @@ class CNNMLPBaseline(nn.Module):
         if self.metadata_dim > 0:
             metadata_features = self.metadata_mlp(metadata)
             # Concatenate features
-            combined_features = torch.cat(
-                [image_features, metadata_features], dim=1)
+            combined_features = torch.cat([image_features, metadata_features], dim=1)
         else:
             combined_features = image_features
 
@@ -156,24 +156,20 @@ class CNNMLPBaseline(nn.Module):
 
 
 MODEL_CONFIGS = {
-    'efficientnet_b0': {
-        'backbone_name': 'efficientnet_b0',
-        'hidden_dim': 256,
-        'dropout_rate': 0.3
+    "efficientnet_b0": {
+        "backbone_name": "efficientnet_b0",
+        "hidden_dim": 256,
+        "dropout_rate": 0.3,
     },
-    'efficientnet_b2': {
-        'backbone_name': 'efficientnet_b2',
-        'hidden_dim': 512,
-        'dropout_rate': 0.5
+    "efficientnet_b2": {
+        "backbone_name": "efficientnet_b2",
+        "hidden_dim": 512,
+        "dropout_rate": 0.5,
     },
-    'efficientnet_b3': {
-        'backbone_name': 'efficientnet_b3',
-        'hidden_dim': 512,
-        'dropout_rate': 0.5
+    "efficientnet_b3": {
+        "backbone_name": "efficientnet_b3",
+        "hidden_dim": 512,
+        "dropout_rate": 0.5,
     },
-    'resnet50': {
-        'backbone_name': 'resnet50',
-        'hidden_dim': 256,
-        'dropout_rate': 0.4
-    }
+    "resnet50": {"backbone_name": "resnet50", "hidden_dim": 256, "dropout_rate": 0.4},
 }
