@@ -1,7 +1,3 @@
-"""
-ISIC 2024 Dataset and Preprocessing Implementation
-"""
-
 import io
 import h5py
 import numpy as np
