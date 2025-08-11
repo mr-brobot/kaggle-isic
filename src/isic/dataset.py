@@ -1,16 +1,15 @@
 import io
+from functools import cache, cached_property
+from pathlib import Path
+from typing import List, Optional, Tuple
+
 import h5py
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from typing import Tuple, List, Optional
-from functools import cached_property, cache
-
 import torch
-from torch.utils.data import Dataset
 from PIL.Image import Image
-
-from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+from torch.utils.data import Dataset
 
 
 class MetadataPreprocessor:
