@@ -26,8 +26,9 @@ def train(
     dataloader: DataLoader,
     criterion: nn.Module,
     optimizer: optim.Optimizer,
-    device,
-):
+    device: torch.device,
+    threshold: float = 0.5,
+) -> Dict[str, float]:
     model.train()
     total_loss = 0
     all_predictions = []
@@ -45,21 +46,23 @@ def train(
         total_loss += loss.item()
 
         probs = torch.sigmoid(logits)
-        predictions = (probs > 0.5).float()
+        predictions = (probs > threshold).float()
 
         all_predictions.extend(predictions.cpu().numpy())
         all_targets.extend(targets.cpu().numpy())
 
+        # TODO: print f1 score instead of accuracy
         if batch_idx % 100 == 0:
             current_acc = accuracy_score(all_targets, all_predictions)
             print(
                 f"Batch {batch_idx:3d}/{len(dataloader)}: Loss: {loss.item():.4f} | Acc: {100.0 * current_acc:.2f}%"
             )
 
-    # Calculate comprehensive metrics
+    # Calculate metrics
     all_predictions = np.array(all_predictions)
     all_targets = np.array(all_targets)
 
+    # TODO: use `torcheval` for all metrics computations
     metrics = {
         "loss": total_loss / len(dataloader),
         "accuracy": accuracy_score(all_targets, all_predictions),
@@ -74,33 +77,40 @@ def train(
     return metrics
 
 
-def validate(model: nn.Module, dataloader: DataLoader, criterion: nn.Module, device):
+@torch.no_grad
+def validate(
+    model: nn.Module,
+    dataloader: DataLoader,
+    criterion: nn.Module,
+    device: torch.device,
+    threshold: float = 0.5,
+) -> tuple[Dict[str, float], np.ndarray, np.ndarray]:
     model.eval()
     total_loss = 0
     all_predictions = []
     all_targets = []
     all_probabilities = []
 
-    with torch.no_grad():
-        for x_img, x_md, targets in dataloader:
-            x_img, x_md, targets = x_img.to(device), x_md.to(device), targets.to(device)
-            logits = model(x_img, x_md).squeeze()
-            loss = criterion(logits, targets)
+    for x_img, x_md, targets in dataloader:
+        x_img, x_md, targets = x_img.to(device), x_md.to(device), targets.to(device)
+        logits = model(x_img, x_md).squeeze()
+        loss = criterion(logits, targets)
 
-            total_loss += loss.item()
+        total_loss += loss.item()
 
-            probs = torch.sigmoid(logits)
-            predictions = (probs > 0.5).float()
+        probs = torch.sigmoid(logits)
+        predictions = (probs > threshold).float()
 
-            all_predictions.extend(predictions.cpu().numpy())
-            all_targets.extend(targets.cpu().numpy())
-            all_probabilities.extend(probs.cpu().numpy())
+        all_predictions.extend(predictions.cpu().numpy())
+        all_targets.extend(targets.cpu().numpy())
+        all_probabilities.extend(probs.cpu().numpy())
 
-    # Calculate comprehensive metrics
+    # Calculate metrics
     all_predictions = np.array(all_predictions)
     all_targets = np.array(all_targets)
     all_probabilities = np.array(all_probabilities)
 
+    # TODO: use `torcheval` for all metrics computations
     metrics = {
         "loss": total_loss / len(dataloader),
         "accuracy": accuracy_score(all_targets, all_predictions),
