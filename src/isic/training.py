@@ -5,19 +5,23 @@ Training utilities for ISIC 2024 models
 import time
 from typing import Dict, List, Optional
 
+import mlflow
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from sklearn.metrics import (
-    accuracy_score,
     average_precision_score,
-    f1_score,
-    precision_score,
-    recall_score,
     roc_auc_score,
 )
 from torch.utils.data import DataLoader
+from torcheval.metrics import (
+    BinaryAccuracy,
+    BinaryAUROC,
+    BinaryF1Score,
+    BinaryPrecision,
+    BinaryRecall,
+)
 from tqdm import tqdm
 
 
@@ -31,8 +35,11 @@ def train(
 ) -> Dict[str, float]:
     model.train()
     total_loss = 0
-    all_predictions = []
-    all_targets = []
+
+    accuracy_metric = BinaryAccuracy(threshold=threshold, device=device)
+    precision_metric = BinaryPrecision(threshold=threshold, device=device)
+    recall_metric = BinaryRecall(threshold=threshold, device=device)
+    f1_metric = BinaryF1Score(threshold=threshold, device=device)
 
     for batch_idx, (x_img, x_md, targets) in enumerate(dataloader):
         x_img, x_md, targets = x_img.to(device), x_md.to(device), targets.to(device)
@@ -46,33 +53,40 @@ def train(
         total_loss += loss.item()
 
         probs = torch.sigmoid(logits)
-        predictions = (probs > threshold).float()
 
-        all_predictions.extend(predictions.cpu().numpy())
-        all_targets.extend(targets.cpu().numpy())
+        # update metrics
+        accuracy_metric.update(probs, targets)
+        precision_metric.update(probs, targets)
+        recall_metric.update(probs, targets.int())  # https://github.com/pytorch/torcheval/issues/209 # fmt: skip
+        f1_metric.update(probs, targets)
 
-        # TODO: print f1 score instead of accuracy
         if batch_idx % 100 == 0:
-            current_acc = accuracy_score(all_targets, all_predictions)
+            current_precision = precision_metric.compute().item()
+            current_recall = recall_metric.compute().item()
             print(
-                f"Batch {batch_idx:3d}/{len(dataloader)}: Loss: {loss.item():.4f} | Acc: {100.0 * current_acc:.2f}%"
+                f"Batch {batch_idx:3d}/{len(dataloader)}: Loss: {loss.item():.4f} | Precision: {current_precision:.3f} | Recall: {current_recall:.3f}"
             )
 
-    # Calculate metrics
-    all_predictions = np.array(all_predictions)
-    all_targets = np.array(all_targets)
+        mlflow.log_metric("batch_loss", loss.item())
 
-    # TODO: use `torcheval` for all metrics computations
     metrics = {
         "loss": total_loss / len(dataloader),
-        "accuracy": accuracy_score(all_targets, all_predictions),
-        "precision": precision_score(all_targets, all_predictions, zero_division=0),
-        "recall": recall_score(all_targets, all_predictions, zero_division=0),
-        "f1": f1_score(all_targets, all_predictions, zero_division=0),
-        "specificity": recall_score(
-            all_targets, all_predictions, pos_label=0, zero_division=0
-        ),
+        "accuracy": accuracy_metric.compute().item(),
+        "precision": precision_metric.compute().item(),
+        "recall": recall_metric.compute().item(),
+        "f1": f1_metric.compute().item(),
+        "specificity": 0.0,  # TODO: implement
     }
+
+    mlflow.log_metrics(
+        {
+            "train_loss": metrics["loss"],
+            "train_accuracy": metrics["accuracy"],
+            "train_precision": metrics["precision"],
+            "train_recall": metrics["recall"],
+            "train_f1": metrics["f1"],
+        }
+    )
 
     return metrics
 
@@ -89,7 +103,12 @@ def validate(
     total_loss = 0
     all_predictions = []
     all_targets = []
-    all_probabilities = []
+
+    accuracy_metric = BinaryAccuracy(threshold=threshold, device=device)
+    precision_metric = BinaryPrecision(threshold=threshold, device=device)
+    recall_metric = BinaryRecall(threshold=threshold, device=device)
+    f1_metric = BinaryF1Score(threshold=threshold, device=device)
+    auroc_metric = BinaryAUROC(device=device)
 
     for x_img, x_md, targets in dataloader:
         x_img, x_md, targets = x_img.to(device), x_md.to(device), targets.to(device)
@@ -101,29 +120,40 @@ def validate(
         probs = torch.sigmoid(logits)
         predictions = (probs > threshold).float()
 
+        # update metrics
+        accuracy_metric.update(probs, targets)
+        precision_metric.update(probs, targets)
+        recall_metric.update(probs, targets.int())  # https://github.com/pytorch/torcheval/issues/209 # fmt: skip
+        f1_metric.update(probs, targets)
+        auroc_metric.update(probs, targets)
+
+        # TODO: remove these arrays arrays
         all_predictions.extend(predictions.cpu().numpy())
         all_targets.extend(targets.cpu().numpy())
-        all_probabilities.extend(probs.cpu().numpy())
 
-    # Calculate metrics
-    all_predictions = np.array(all_predictions)
-    all_targets = np.array(all_targets)
-    all_probabilities = np.array(all_probabilities)
-
-    # TODO: use `torcheval` for all metrics computations
     metrics = {
         "loss": total_loss / len(dataloader),
-        "accuracy": accuracy_score(all_targets, all_predictions),
-        "precision": precision_score(all_targets, all_predictions, zero_division=0),
-        "recall": recall_score(all_targets, all_predictions, zero_division=0),
-        "f1": f1_score(all_targets, all_predictions, zero_division=0),
-        "specificity": recall_score(
-            all_targets, all_predictions, pos_label=0, zero_division=0
-        ),
-        "roc_auc": roc_auc_score(all_targets, all_probabilities)
-        if len(np.unique(all_targets)) > 1
-        else 0.0,
+        "accuracy": accuracy_metric.compute().item(),
+        "precision": precision_metric.compute().item(),
+        "recall": recall_metric.compute().item(),
+        "f1": f1_metric.compute().item(),
+        "specificity": 0.0,  # TODO: implement
+        "roc_auc": auroc_metric.compute().item(),
     }
+
+    mlflow.log_metrics(
+        {
+            "val_loss": metrics["loss"],
+            "val_accuracy": metrics["accuracy"],
+            "val_precision": metrics["precision"],
+            "val_recall": metrics["recall"],
+            "val_f1": metrics["f1"],
+            "val_roc_auc": metrics["roc_auc"],
+        }
+    )
+
+    all_predictions = np.array(all_predictions)
+    all_targets = np.array(all_targets)
 
     return metrics, all_targets, all_predictions
 
