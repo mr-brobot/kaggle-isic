@@ -181,4 +181,5 @@ data/*
 .mcp.json
 
 # mlflow
-mlruns/*
+mlruns/
+mlartifacts/
