@@ -28,18 +28,14 @@ This is a machine learning project for the ISIC 2024 Skin Cancer Detection chall
 - CUDA support available (code checks for GPU)
 - Uses `uv` for dependency management (uv.lock present)
 
-## Data Access Setup
+## Code Style
 
-1. Set up Kaggle API key: https://www.kaggle.com/docs/api#getting-started-installation-&-authentication
-2. Download data:
-   ```bash
-   mkdir data
-   cd data
-   kaggle competitions download -c isic-2024-challenge
-   unzip isic-2024-challenge.zip
-   rm isic-2024-challenge.zip
-   cd -
-   ```
+- **Design Philosophy**: Prefer simplicity and elegance over complexity; strive for concise, elegant, and readable code; every line of code should have clear and articulable value
+- **Strong Typing**: Use strict type checking and make types explicit; rely on the the type system to prevent errors
+- **Functional Programming**: Prefer pure functions over classes; separate side effects and mutations
+- **Testing Philosophy**: Focus tests on logic that the type system cannot verify; aim for meaningful test coverage rather than arbitrary metrics
+- **Error Handling**: Only catch exceptions when you can meaningfully recover or transform; avoid empty catch-log-reraise patterns that add more noise than value
+- **Comments**: Only use inline comments to explain context that is not obvious; avoid excessive comments as they add noise; prefer extracting complex logic into well-named functions.
 
 ## Notebooks Structure
 
@@ -53,9 +49,3 @@ The current MLP model combines:
 - Image features: Flattened 128x128 images processed through fully connected layers
 - Metadata features: Age, sex, and anatomical site (one-hot encoded)
 - Final prediction: Binary classification with sigmoid activation
-
-## Data Processing Pipeline
-
-- Images: Resize to 128x128, convert to tensors
-- Metadata: Normalize age_approx, one-hot encode sex and anatom_site_general
-- Custom Dataset class handles HDF5 file reading and metadata alignment
