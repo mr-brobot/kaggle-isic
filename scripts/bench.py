@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import time
 from functools import partial
 from pathlib import Path
@@ -7,12 +5,11 @@ from typing import Tuple
 
 import mlflow
 import numpy as np
-import torch
 import typer
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 
 from isic.dataset import ISICDataset, collate_batch
 from isic.tracing import dataframe_filter, image_filter, tensor_filter
@@ -34,7 +31,7 @@ def setup_environment(data_dir: Path, enable_tracing: bool = True) -> Tuple[Path
 
     mlflow.set_tracking_uri("http://localhost:5000")
     mlflow.set_experiment("benchmarking")
-    
+
     if enable_tracing:
         mlflow.tracing.configure(
             span_processors=[tensor_filter, dataframe_filter, image_filter]
@@ -73,18 +70,11 @@ def create_dataloader(
     md_encoders = {"sex": sex_enc, "anatom_site_general": anatom_site_general_enc}
     collate = partial(collate_batch, img_size=image_size, md_encoders=md_encoders)
 
-    # Use a subset for faster benchmarking
-    generator = torch.Generator().manual_seed(42)
-    subset, _ = random_split(
-        dataset, [sample_size, len(dataset) - sample_size], generator=generator
-    )
-
     return DataLoader(
-        subset,
+        dataset,
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate,
-        generator=generator,
     )
 
 
@@ -93,7 +83,11 @@ def benchmark_batches(
     batch_size: int = typer.Option(128, help="Batch size for data loading"),
     image_size: int = typer.Option(128, help="Image size (square)"),
     data_dir: Path = typer.Option(Path("data"), help="Directory containing data files"),
-    tracing: bool = typer.Option(False, "--tracing", help="Enable MLflow tracing (slower but provides detailed spans)"),
+    tracing: bool = typer.Option(
+        False,
+        "--tracing",
+        help="Enable MLflow tracing (slower but provides detailed spans)",
+    ),
 ) -> None:
     """Benchmark data loading performance."""
 
@@ -105,7 +99,6 @@ def benchmark_batches(
 
     train_images_file, train_metadata_file = setup_environment(data_dir, tracing)
 
-    console.print("[yellow]Setting up dataset and dataloader...[/yellow]")
     dataset = ISICDataset(train_images_file, train_metadata_file)
 
     img_size = (image_size, image_size)
@@ -116,85 +109,86 @@ def benchmark_batches(
         f"[green]Dataloader ready[/green] - Batches available: {len(dataloader):,}"
     )
 
-    with dataset:
-        with mlflow.start_run(log_system_metrics=True):
-            mlflow.log_params(
-                {
-                    "batches": batches,
-                    "batch_size": batch_size,
-                    "image_size": image_size,
-                    "total_samples": len(dataset),
-                }
-            )
+    with dataset, mlflow.start_run(log_system_metrics=True):
+        mlflow.log_params(
+            {
+                "batches": batches,
+                "batch_size": batch_size,
+                "image_size": image_size,
+                "total_samples": len(dataset),
+            }
+        )
 
-            console.print("\n[bold yellow]Running benchmark...[/bold yellow]")
+        console.print("\n[bold yellow]Running benchmark...[/bold yellow]")
 
-            data_iter = iter(dataloader)
-            times = []
+        data_iter = iter(dataloader)
+        times = []
 
-            for i in track(range(batches), description="Loading batches"):
-                try:
-                    start_time = time.time()
-                    _ = next(data_iter)
-                    elapsed = time.time() - start_time
-                    times.append(elapsed)
-                except StopIteration:
-                    console.print(
-                        f"[yellow]Warning: Only {i} batches available, stopping early[/yellow]"
-                    )
-                    break
+        for i in track(range(batches), description="Loading batches"):
+            try:
+                start_time = time.time()
+                _ = next(data_iter)
+                elapsed = time.time() - start_time
+                times.append(elapsed)
+            except StopIteration:
+                console.print(
+                    f"[yellow]Warning: Only {i} batches available, stopping early[/yellow]"
+                )
+                break
 
-            # Calculate statistics
-            times_array = np.array(times)
-            mean_time = np.mean(times_array)
-            std_time = np.std(times_array)
-            min_time = np.min(times_array)
-            max_time = np.max(times_array)
-            
-            # Calculate estimated epoch time (total batches needed for full dataset)
-            total_samples = len(dataset)
-            total_batches_per_epoch = (total_samples + batch_size - 1) // batch_size  # Ceiling division
-            estimated_epoch_time = mean_time * total_batches_per_epoch
+        # Calculate statistics
+        times_array = np.array(times)
+        mean_time = np.mean(times_array)
+        std_time = np.std(times_array)
+        min_time = np.min(times_array)
+        max_time = np.max(times_array)
 
-            # Log metrics to MLflow
-            mlflow.log_metrics(
-                {
-                    "mean_batch_time": float(mean_time),
-                    "std_batch_time": float(std_time),
-                    "min_batch_time": min_time,
-                    "max_batch_time": max_time,
-                    "batches_processed": len(times),
-                    "estimated_epoch_time": float(estimated_epoch_time),
-                    "total_batches_per_epoch": total_batches_per_epoch,
-                }
-            )
+        # Calculate estimated epoch time (total batches needed for full dataset)
+        total_samples = len(dataset)
+        total_batches_per_epoch = (
+            total_samples + batch_size - 1
+        ) // batch_size  # Ceiling division
+        estimated_epoch_time = mean_time * total_batches_per_epoch
 
-            # Create results table
-            table = Table(title="Benchmarking Results")
-            table.add_column("Metric", style="cyan")
-            table.add_column("Value", style="green")
+        # Log metrics to MLflow
+        mlflow.log_metrics(
+            {
+                "mean_batch_time": float(mean_time),
+                "std_batch_time": float(std_time),
+                "min_batch_time": min_time,
+                "max_batch_time": max_time,
+                "batches_processed": len(times),
+                "estimated_epoch_time": float(estimated_epoch_time),
+                "total_batches_per_epoch": total_batches_per_epoch,
+            }
+        )
 
-            table.add_row("Batches processed", str(len(times)))
-            table.add_row("Mean time per batch", f"{mean_time:.3f}s")
-            table.add_row("Std deviation", f"{std_time:.3f}s")
-            table.add_row("Min time", f"{min_time:.3f}s")
-            table.add_row("Max time", f"{max_time:.3f}s")
-            table.add_row("Samples per second", f"{(batch_size / mean_time):.1f}")
-            
-            # Format epoch time as minutes if > 60s, otherwise seconds
-            if estimated_epoch_time >= 60:
-                epoch_time_str = f"{estimated_epoch_time / 60:.1f}min"
-            else:
-                epoch_time_str = f"{estimated_epoch_time:.1f}s"
-            
-            table.add_row("Estimated epoch time", epoch_time_str)
-            table.add_row("Total batches per epoch", str(total_batches_per_epoch))
+        # Create results table
+        table = Table(title="Benchmarking Results")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
 
-            console.print("\n")
-            console.print(table)
+        table.add_row("Batches processed", str(len(times)))
+        table.add_row("Mean time per batch", f"{mean_time:.3f}s")
+        table.add_row("Std deviation", f"{std_time:.3f}s")
+        table.add_row("Min time", f"{min_time:.3f}s")
+        table.add_row("Max time", f"{max_time:.3f}s")
+        table.add_row("Samples per second", f"{(batch_size / mean_time):.1f}")
 
-            console.print("\n[green]✓ Benchmark complete![/green]")
-            console.print(f"[dim]MLflow run: {mlflow.active_run().info.run_id}[/dim]")
+        # Format epoch time as minutes if > 60s, otherwise seconds
+        if estimated_epoch_time >= 60:
+            epoch_time_str = f"{estimated_epoch_time / 60:.1f}min"
+        else:
+            epoch_time_str = f"{estimated_epoch_time:.1f}s"
+
+        table.add_row("Estimated epoch time", epoch_time_str)
+        table.add_row("Total batches per epoch", str(total_batches_per_epoch))
+
+        console.print("\n")
+        console.print(table)
+
+        console.print("\n[green]✓ Benchmark complete![/green]")
+        console.print(f"[dim]MLflow run: {mlflow.active_run().info.run_id}[/dim]")
 
 
 if __name__ == "__main__":
