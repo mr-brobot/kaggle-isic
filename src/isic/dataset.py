@@ -101,8 +101,27 @@ class ISICDataset(Dataset):
 
 
 @mlflow.trace
-def to_tensor(series: pd.Series, encoders: Dict[str, OneHotEncoder]) -> torch.Tensor:
-    df = series.loc[["age_approx", "sex", "anatom_site_general"]].to_frame().T
+def collate_images(
+    images: Sequence[Image], image_size: Tuple[int, int]
+) -> torch.Tensor:
+    # resize
+    scaled_imgs = [img.resize(image_size) for img in images]
+
+    # to tensor
+    result = torch.stack([pil_to_tensor(img) for img in scaled_imgs])
+
+    # normalize
+    result = result.float() / 255.0
+
+    return result
+
+
+@mlflow.trace
+def collate_metadata(
+    rows: Sequence[pd.Series], encoders: Dict[str, OneHotEncoder]
+) -> torch.Tensor:
+    df = pd.DataFrame(rows)
+    df = df[["age_approx", "sex", "anatom_site_general"]].copy()
 
     # age_approx: convert, impute, normalize
     df.loc[:, "age_approx"] = pd.to_numeric(df["age_approx"], errors="coerce").fillna(0)
@@ -126,45 +145,19 @@ def to_tensor(series: pd.Series, encoders: Dict[str, OneHotEncoder]) -> torch.Te
 
     # ensure all columns are numeric
     df = df.astype(float)
-    return torch.tensor(df.iloc[0].values, dtype=torch.float32)
-
-
-@mlflow.trace
-def collate_images(
-    images: Sequence[Image],
-    image_size: Tuple[int, int],
-    device: torch.device,
-) -> torch.Tensor:
-    # resize
-    scaled_imgs = [img.resize(image_size) for img in images]
-
-    # to tensor
-    result = torch.stack([pil_to_tensor(img).to(device) for img in scaled_imgs])
-
-    # normalize
-    result = result.float() / 255.0
-
-    return result
-
-
-@mlflow.trace
-def collate_metadata(
-    rows: Sequence[pd.Series], encoders: Dict[str, OneHotEncoder]
-) -> torch.Tensor:
-    return torch.stack([to_tensor(row, encoders) for row in rows])
+    return torch.tensor(df.values, dtype=torch.float32)
 
 
 @mlflow.trace
 def collate_batch(
-    batch,
+    batch: Sequence[Tuple[pd.Series, Image, str]],
     img_size: Tuple[int, int],
     md_encoders: Dict[str, OneHotEncoder],
-    device: torch.device,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Custom collate function for training data"""
     rows, images, targets = zip(*batch)
 
-    x_imgs = collate_images(images, img_size, device)
+    x_imgs = collate_images(images, img_size)
     x_mds = collate_metadata(rows, md_encoders)
     y = torch.tensor(targets, dtype=torch.int8)
 
