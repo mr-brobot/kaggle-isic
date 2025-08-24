@@ -31,5 +31,7 @@ build-backend = "hatchling.build"
 dev = [
     "pyrefly>=0.29.2",
     "pytest>=8.4.1",
+    "rich>=13.6.0",
     "ruff>=0.12.10",
+    "typer>=0.12.0",
 ]
