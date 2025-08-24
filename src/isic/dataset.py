@@ -159,7 +159,7 @@ def collate_batch(
 
     x_imgs = collate_images(images, img_size)
     x_mds = collate_metadata(rows, md_encoders)
-    y = torch.tensor(targets, dtype=torch.int8)
+    y = torch.tensor(targets, dtype=torch.float32)
 
     return x_imgs, x_mds, y
 
