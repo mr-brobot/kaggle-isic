@@ -17,16 +17,16 @@ from torch.utils.data import Dataset
 from torchvision.transforms.functional import pil_to_tensor
 
 
+@dataclass
 class ISICDataset(Dataset):
     """
     ISIC Dataset for multimodal skin cancer detection.
     """
-
-    def __init__(self, hdf5_path: Path, metadata_path: Path):
-        self.hdf5_path = hdf5_path
-        self.metadata_path = metadata_path
-        self._hdf5_file = None
-        self._metadata = None
+    
+    hdf5_path: Path
+    metadata_path: Path
+    _hdf5_file: Optional[h5py.File] = None
+    _metadata: Optional[pd.DataFrame] = None
 
     @property
     def metadata(self) -> pd.DataFrame:
@@ -63,7 +63,7 @@ class ISICDataset(Dataset):
         self.close()
         # Return None to propagate any exception
 
-    @mlflow.trace
+    @mlflow.trace(name="ISICDataset.image")
     def image(self, key: str) -> Image:
         from PIL import Image
 
@@ -76,14 +76,14 @@ class ISICDataset(Dataset):
         b = io.BytesIO(self._hdf5_file[key][()])
         return Image.open(b)
 
-    @mlflow.trace
+    @mlflow.trace(name="ISICDataset.row")
     def row(self, idx: int) -> pd.Series:
         return self.metadata.iloc[idx]
 
     def __len__(self):
         return len(self.metadata)
 
-    @mlflow.trace
+    @mlflow.trace(name="ISICDataset.__getitem__")
     def __getitem__(self, idx: int) -> Tuple[pd.Series, Image, int]:
         if type(idx) is not int:
             raise ValueError(f"ISICDataset: Unexpected index type {idx} ({type(idx)})")
