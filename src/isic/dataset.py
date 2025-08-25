@@ -8,13 +8,14 @@ import h5py
 import mlflow
 import pandas as pd
 import torch
-from PIL.Image import Image
+import torchvision.transforms.v2 as T
+from cryptography.utils import cached_property
+from PIL.Image import Image as PILImage
 from sklearn.preprocessing import (
     MinMaxScaler,
     OneHotEncoder,
 )
 from torch.utils.data import Dataset
-from torchvision.transforms.functional import pil_to_tensor
 
 
 @dataclass
@@ -22,7 +23,7 @@ class ISICDataset(Dataset):
     """
     ISIC Dataset for multimodal skin cancer detection.
     """
-    
+
     hdf5_path: Path
     metadata_path: Path
     _hdf5_file: Optional[h5py.File] = None
@@ -64,7 +65,7 @@ class ISICDataset(Dataset):
         # Return None to propagate any exception
 
     @mlflow.trace(name="ISICDataset.image")
-    def image(self, key: str) -> Image:
+    def image(self, key: str) -> PILImage:
         from PIL import Image
 
         if self._hdf5_file is None:
@@ -84,7 +85,7 @@ class ISICDataset(Dataset):
         return len(self.metadata)
 
     @mlflow.trace(name="ISICDataset.__getitem__")
-    def __getitem__(self, idx: int) -> Tuple[pd.Series, Image, int]:
+    def __getitem__(self, idx: int) -> Tuple[pd.Series, PILImage, int]:
         if type(idx) is not int:
             raise ValueError(f"ISICDataset: Unexpected index type {idx} ({type(idx)})")
 
@@ -106,8 +107,21 @@ class ImageEncoder:
 
     image_size: Tuple[int, int]
 
+    @cached_property
+    def transform(self) -> T.Transform:
+        return T.Compose(
+            [
+                T.ToImage(),
+                T.Resize(
+                    size=self.image_size,
+                    interpolation=T.InterpolationMode.BICUBIC,
+                ),
+                T.ToDtype(dtype=torch.float32, scale=True),
+            ]
+        )
+
     @mlflow.trace(name="ImageEncoder")
-    def __call__(self, images: Sequence[Image]) -> torch.Tensor:
+    def __call__(self, images: Sequence[PILImage]) -> torch.Tensor:
         """
         Encode a sequence of images as a tensor
 
@@ -119,16 +133,9 @@ class ImageEncoder:
         Returns:
             torch.Tensor: Batch tensor with shape (N, C, H, W) where N is the number of images
         """
-        # resize
-        scaled_images = [i.resize(self.image_size) for i in images]
+        results = self.transform(images)
 
-        # stack
-        result = torch.stack([pil_to_tensor(i) for i in scaled_images])
-
-        # normalize
-        result = result.float() / 255.0
-
-        return result
+        return torch.stack(results)
 
 
 @dataclass
@@ -239,7 +246,7 @@ class BatchEncoder:
 
     @mlflow.trace(name="BatchEncoder")
     def __call__(
-        self, batch: Sequence[Tuple[pd.Series, Image, str]]
+        self, batch: Sequence[Tuple[pd.Series, PILImage, str]]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Process batch of (metadata, image, target) tuples.
