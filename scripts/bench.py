@@ -1,5 +1,4 @@
 import time
-from functools import partial
 from pathlib import Path
 from typing import Tuple
 
@@ -11,7 +10,7 @@ from rich.progress import track
 from rich.table import Table
 from torch.utils.data import DataLoader
 
-from isic.dataset import ISICDataset, collate_batch
+from isic.dataset import BatchEncoder, ImageEncoder, ISICDataset, MetadataEncoder
 from isic.tracing import dataframe_filter, image_filter, tensor_filter
 
 console = Console()
@@ -48,33 +47,18 @@ def create_dataloader(
     image_size: Tuple[int, int],
     sample_size: int = 10000,
 ) -> DataLoader:
-    from sklearn.preprocessing import OneHotEncoder
-
-    sex_enc = OneHotEncoder(categories=[["male", "female"]], handle_unknown="ignore")
-    anatom_site_general_enc = OneHotEncoder(
-        categories=[
-            [
-                "head/neck",
-                "upper extremity",
-                "lower extremity",
-                "posterior torso",
-                "anterior torso",
-            ]
-        ],
-        handle_unknown="ignore",
+    image_encoder = ImageEncoder(image_size=image_size)
+    metadata_encoder = MetadataEncoder().fit(dataset.metadata)
+    batch_encoder = BatchEncoder(
+        image_encoder=image_encoder,
+        metadata_encoder=metadata_encoder,
     )
-
-    sex_enc.fit(dataset.metadata[["sex"]])
-    anatom_site_general_enc.fit(dataset.metadata[["anatom_site_general"]])
-
-    md_encoders = {"sex": sex_enc, "anatom_site_general": anatom_site_general_enc}
-    collate = partial(collate_batch, img_size=image_size, md_encoders=md_encoders)
 
     return DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=True,
-        collate_fn=collate,
+        collate_fn=batch_encoder,
     )
 
 
