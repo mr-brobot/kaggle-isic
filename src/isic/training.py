@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from sklearn.metrics import classification_report, confusion_matrix
 from torch.utils.data import DataLoader
 from torcheval.metrics import (
     BinaryAccuracy,
@@ -122,7 +123,6 @@ def validate(
         f1_metric.update(probs, targets)
         auroc_metric.update(probs, targets)
 
-        # TODO: remove these arrays arrays
         all_predictions.extend(predictions.cpu().numpy())
         all_targets.extend(targets.cpu().numpy())
 
@@ -175,3 +175,60 @@ def calculate_pos_weight(train_loader: DataLoader) -> float:
     print(f"Calculated positive weight: {pos_weight:.2f}")
 
     return pos_weight
+
+
+def training_summary(
+    val_targets: np.ndarray,
+    val_predictions: np.ndarray,
+) -> str:
+    """
+    Generate formatted summary for completed training session.
+
+    Args:
+        val_targets: True validation targets
+        val_predictions: Predicted validation labels
+
+    Returns:
+        Formatted training summary string
+    """
+    lines = []
+
+    lines.append("\nTraining Summary:")
+
+    lines.append("\nValidation Results:")
+    cm = confusion_matrix(val_targets, val_predictions)
+    lines.append("Confusion Matrix:")
+    lines.append("                    Predicted")
+    lines.append("                Benign  Malignant  Total")
+    lines.append(
+        f"Actual Benign     {cm[0, 0]:4d}      {cm[0, 1]:4d}   {cm[0, 0] + cm[0, 1]:4d}"
+    )
+    lines.append(
+        f"    Malignant     {cm[1, 0]:4d}      {cm[1, 1]:4d}     {cm[1, 0] + cm[1, 1]:3d}"
+    )
+
+    # Calculate key medical metrics
+    if cm[1, 0] + cm[1, 1] > 0:  # If there are malignant cases
+        sensitivity = cm[1, 1] / (cm[1, 0] + cm[1, 1])
+        missed_malignant = cm[1, 0]
+        detected_malignant = cm[1, 1]
+
+        lines.append("\n🏥 CRITICAL MEDICAL METRICS:")
+        lines.append(f"• Malignant cases in validation: {cm[1, 0] + cm[1, 1]}")
+        lines.append(f"• Malignant cases DETECTED: {detected_malignant}")
+        lines.append(f"• Malignant cases MISSED: {missed_malignant}")
+        lines.append(f"• Sensitivity (Detection Rate): {sensitivity:.1%}")
+
+        if missed_malignant > 0:
+            lines.append(
+                f"⚠️  WARNING: {missed_malignant} malignant cases would go undiagnosed!"
+            )
+
+    lines.append("\nDetailed Classification Report:")
+    lines.append(
+        classification_report(
+            val_targets, val_predictions, target_names=["Benign", "Malignant"], digits=4
+        )
+    )
+
+    return "\n".join(lines)
