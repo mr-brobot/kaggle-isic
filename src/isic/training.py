@@ -153,30 +153,6 @@ def validate(
     return metrics, all_targets, all_predictions
 
 
-def calculate_pos_weight(train_loader: DataLoader) -> float:
-    """
-    Calculate positive class weight for handling class imbalance.
-
-    Args:
-        train_loader: Training data loader
-
-    Returns:
-        Positive class weight
-    """
-    pos_count = 0
-    neg_count = 0
-
-    for _, _, targets in train_loader:
-        pos_count += targets.sum().item()
-        neg_count += (1 - targets).sum().item()
-
-    pos_weight = neg_count / pos_count
-    print(f"Class counts - Negative: {neg_count}, Positive: {pos_count}")
-    print(f"Calculated positive weight: {pos_weight:.2f}")
-
-    return pos_weight
-
-
 def training_summary(
     val_targets: np.ndarray,
     val_predictions: np.ndarray,

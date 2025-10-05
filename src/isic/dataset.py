@@ -84,6 +84,18 @@ class ISICDataset(Dataset):
     def __len__(self):
         return len(self.metadata)
 
+    @cached_property
+    def pos_weight(self) -> float:
+        """
+        Positive class weight for BCEWithLogitsLoss.
+
+        Calculated as neg_count / pos_count to handle class imbalance.
+        """
+        targets = self.metadata["target"]
+        neg_count = (targets == 0).sum()
+        pos_count = (targets == 1).sum()
+        return neg_count / pos_count
+
     @mlflow.trace(name="ISICDataset.__getitem__")
     def __getitem__(self, idx: int) -> Tuple[pd.Series, PILImage, int]:
         if type(idx) is not int:
