@@ -35,6 +35,16 @@
     "mounts": [
         "source=${localEnv:HOME}${localEnv:USERPROFILE}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached"
     ],
+    "containerEnv": {
+        "OTEL_TRACES_EXPORTER": "otlp",
+        "OTEL_METRICS_EXPORTER": "none",
+        "OTEL_SERVICE_NAME": "isic",
+        "OTEL_PYTHON_DISTRO": "aws_distro",
+        "OTEL_PYTHON_CONFIGURATOR": "aws_configurator",
+        "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "http/protobuf",
+        "OTEL_RESOURCE_ATTRIBUTES": "deployment.environment=local"
+    },
+    "postCreateCommand": ".devcontainer/setup.sh",
     "remoteUser": "vscode",
     "features": {
         "ghcr.io/devcontainers/features/python:1": {
@@ -43,7 +53,7 @@
         "ghcr.io/va-h/devcontainers-features/uv:1": {},
         "ghcr.io/devcontainers-extra/features/ruff:1": {},
         "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
-        "ghcr.io/devcontainers/features/docker-outside-of-docker": {},
+        "ghcr.io/devcontainers/features/aws-cli:1": {},
         "ghcr.io/devcontainers/features/nvidia-cuda:2.0": {
             "installCudnn": true,
             "installCudnnDev": true,

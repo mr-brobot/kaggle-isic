@@ -4,11 +4,11 @@ Training utilities for ISIC 2024 models
 
 from typing import Dict
 
-import mlflow
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import trackio
 from sklearn.metrics import classification_report, confusion_matrix
 from torch.utils.data import DataLoader
 from torcheval.metrics import (
@@ -63,7 +63,7 @@ def train(
                 f"Batch {batch_idx:3d}/{len(dataloader)}: Loss: {loss.item():.4f} | Precision: {current_precision:.3f} | Recall: {current_recall:.3f}"
             )
 
-        mlflow.log_metric("batch_loss", loss.item())
+        trackio.log({"batch_loss": loss.item()})
 
     metrics = {
         "loss": total_loss / len(dataloader),
@@ -74,7 +74,7 @@ def train(
         "specificity": 0.0,  # TODO: implement
     }
 
-    mlflow.log_metrics(
+    trackio.log(
         {
             "train_loss": metrics["loss"],
             "train_accuracy": metrics["accuracy"],
@@ -136,7 +136,7 @@ def validate(
         "roc_auc": auroc_metric.compute().item(),
     }
 
-    mlflow.log_metrics(
+    trackio.log(
         {
             "val_loss": metrics["loss"],
             "val_accuracy": metrics["accuracy"],

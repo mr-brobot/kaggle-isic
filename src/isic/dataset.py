@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional, Sequence, Tuple
 
 import h5py
-import mlflow
 import pandas as pd
 import torch
 import torchvision.transforms.v2 as T
@@ -51,7 +50,7 @@ class ISICDataset(Dataset):
 
     def close(self) -> None:
         """Close the HDF5 file if it's open."""
-        if self.is_open:
+        if self.is_open and self._hdf5_file:
             self._hdf5_file.close()
             self._hdf5_file = None
 
@@ -64,7 +63,6 @@ class ISICDataset(Dataset):
         self.close()
         # Return None to propagate any exception
 
-    @mlflow.trace(name="ISICDataset.image")
     def image(self, key: str) -> PILImage:
         from PIL import Image
 
@@ -77,7 +75,6 @@ class ISICDataset(Dataset):
         b = io.BytesIO(self._hdf5_file[key][()])
         return Image.open(b)
 
-    @mlflow.trace(name="ISICDataset.row")
     def row(self, idx: int) -> pd.Series:
         return self.metadata.iloc[idx]
 
@@ -96,7 +93,6 @@ class ISICDataset(Dataset):
         pos_count = (targets == 1).sum()
         return neg_count / pos_count
 
-    @mlflow.trace(name="ISICDataset.__getitem__")
     def __getitem__(self, idx: int) -> Tuple[pd.Series, PILImage, int]:
         if type(idx) is not int:
             raise ValueError(f"ISICDataset: Unexpected index type {idx} ({type(idx)})")
@@ -132,7 +128,6 @@ class ImageEncoder:
             ]
         )
 
-    @mlflow.trace(name="ImageEncoder")
     def __call__(self, images: Sequence[PILImage]) -> torch.Tensor:
         """
         Encode a sequence of images as a tensor
@@ -146,7 +141,6 @@ class ImageEncoder:
             torch.Tensor: Batch tensor with shape (N, C, H, W) where N is the number of images
         """
         results = self.transform(images)
-
         return torch.stack(results)
 
 
@@ -203,7 +197,6 @@ class MetadataEncoder:
         self._is_fitted = True
         return self
 
-    @mlflow.trace(name="MetadataEncoder")
     def __call__(self, df: pd.DataFrame) -> torch.Tensor:
         """
         Encode metadata into tensor using fitted transformers.
@@ -256,7 +249,6 @@ class BatchEncoder:
     image_encoder: ImageEncoder
     metadata_encoder: MetadataEncoder
 
-    @mlflow.trace(name="BatchEncoder")
     def __call__(
         self, batch: Sequence[Tuple[pd.Series, PILImage, str]]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

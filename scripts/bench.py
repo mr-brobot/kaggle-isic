@@ -1,44 +1,25 @@
 import time
 from pathlib import Path
-from typing import Tuple
+from typing import Any, Iterator, Tuple
 
-import mlflow
 import numpy as np
 import typer
+from opentelemetry import trace
 from rich.console import Console
 from rich.progress import track
 from rich.table import Table
 from torch.utils.data import DataLoader
 
 from isic.dataset import BatchEncoder, ImageEncoder, ISICDataset, MetadataEncoder
-from isic.tracing import dataframe_filter, image_filter, tensor_filter
 
 console = Console()
+tracer = trace.get_tracer(__name__)
 
 
-def setup_environment(data_dir: Path, enable_tracing: bool = True) -> Tuple[Path, Path]:
-    train_images_file = data_dir / "train-image.hdf5"
-    train_metadata_file = data_dir / "train-metadata.csv"
-
-    if not train_images_file.exists():
-        console.print(f"[red]Error: {train_images_file} not found[/red]")
-        raise typer.Exit(1)
-
-    if not train_metadata_file.exists():
-        console.print(f"[red]Error: {train_metadata_file} not found[/red]")
-        raise typer.Exit(1)
-
-    mlflow.set_tracking_uri("http://localhost:5000")
-    mlflow.set_experiment("benchmarking")
-
-    if enable_tracing:
-        mlflow.tracing.configure(
-            span_processors=[tensor_filter, dataframe_filter, image_filter]
-        )
-    else:
-        mlflow.tracing.disable()
-
-    return train_images_file, train_metadata_file
+@tracer.start_as_current_span("load_batch")
+def load_batch(data_iter: Iterator) -> Any:
+    """Load a single batch from the data iterator."""
+    return next(data_iter)
 
 
 def create_dataloader(
@@ -67,11 +48,6 @@ def benchmark_batches(
     batch_size: int = typer.Option(128, help="Batch size for data loading"),
     image_size: int = typer.Option(128, help="Image size (square)"),
     data_dir: Path = typer.Option(Path("data"), help="Directory containing data files"),
-    tracing: bool = typer.Option(
-        False,
-        "--tracing",
-        help="Enable MLflow tracing (slower but provides detailed spans)",
-    ),
 ) -> None:
     """Benchmark data loading performance."""
 
@@ -81,7 +57,16 @@ def benchmark_batches(
     )
     console.print(f"Data directory: {data_dir}")
 
-    train_images_file, train_metadata_file = setup_environment(data_dir, tracing)
+    train_images_file = data_dir / "train-image.hdf5"
+    train_metadata_file = data_dir / "train-metadata.csv"
+
+    if not train_images_file.exists():
+        console.print(f"[red]Error: {train_images_file} not found[/red]")
+        raise typer.Exit(1)
+
+    if not train_metadata_file.exists():
+        console.print(f"[red]Error: {train_metadata_file} not found[/red]")
+        raise typer.Exit(1)
 
     dataset = ISICDataset(train_images_file, train_metadata_file)
 
@@ -93,16 +78,7 @@ def benchmark_batches(
         f"[green]Dataloader ready[/green] - Batches available: {len(dataloader):,}"
     )
 
-    with dataset, mlflow.start_run(log_system_metrics=True):
-        mlflow.log_params(
-            {
-                "batches": batches,
-                "batch_size": batch_size,
-                "image_size": image_size,
-                "total_samples": len(dataset),
-            }
-        )
-
+    with dataset:
         console.print("\n[bold yellow]Running benchmark...[/bold yellow]")
 
         data_iter = iter(dataloader)
@@ -111,7 +87,7 @@ def benchmark_batches(
         for i in track(range(batches), description="Loading batches"):
             try:
                 start_time = time.time()
-                _ = next(data_iter)
+                _ = load_batch(data_iter)
                 elapsed = time.time() - start_time
                 times.append(elapsed)
             except StopIteration:
@@ -133,19 +109,6 @@ def benchmark_batches(
             total_samples + batch_size - 1
         ) // batch_size  # Ceiling division
         estimated_epoch_time = mean_time * total_batches_per_epoch
-
-        # Log metrics to MLflow
-        mlflow.log_metrics(
-            {
-                "mean_batch_time": float(mean_time),
-                "std_batch_time": float(std_time),
-                "min_batch_time": min_time,
-                "max_batch_time": max_time,
-                "batches_processed": len(times),
-                "estimated_epoch_time": float(estimated_epoch_time),
-                "total_batches_per_epoch": total_batches_per_epoch,
-            }
-        )
 
         # Create results table
         table = Table(title="Benchmarking Results")
@@ -172,7 +135,6 @@ def benchmark_batches(
         console.print(table)
 
         console.print("\n[green]✓ Benchmark complete![/green]")
-        console.print(f"[dim]MLflow run: {mlflow.active_run().info.run_id}[/dim]")
 
 
 if __name__ == "__main__":

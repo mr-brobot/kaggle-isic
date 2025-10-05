@@ -14,6 +14,8 @@ This is a machine learning project for the ISIC 2024 Skin Cancer Detection chall
 
 ## Key Dependencies
 
+### ML/Data
+
 - **PyTorch**: Primary ML framework for model development
 - **h5py**: For reading HDF5 image files
 - **pandas**: Data manipulation and analysis
@@ -21,6 +23,16 @@ This is a machine learning project for the ISIC 2024 Skin Cancer Detection chall
 - **PIL/Pillow**: Image processing
 - **matplotlib**: Data visualization
 - **numpy**: Numerical operations
+
+### Experiment Tracking
+
+- **trackio**: Lightweight experiment tracking (params, metrics, runs)
+
+### Observability
+
+- **AWS Distro for OpenTelemetry (ADOT)**: Collector-less setup with direct export to AWS X-Ray
+- **Auto-instrumentation**: Scripts only (notebooks require manual instrumentation)
+- **Configuration**: X-Ray endpoint auto-configured based on AWS region from profile/env vars
 
 ## Development Environment
 

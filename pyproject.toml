@@ -5,11 +5,12 @@ description = "https://www.kaggle.com/competitions/isic-2024-challenge"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aws-opentelemetry-distro>=0.12.1",
+    "boto3>=1.40.46",
     "h5py>=3.14.0",
     "ipywidgets>=8.1.7",
     "kaggle>=1.7.4.5",
     "matplotlib>=3.10.3",
-    "mlflow>=3.3.0",
     "notebook>=7.4.3",
     "numpy>=2.3.0",
     "pandas>=2.3.0",
@@ -21,6 +22,7 @@ dependencies = [
     "torch>=2.7.1",
     "torcheval>=0.0.7",
     "torchvision>=0.22.1",
+    "trackio>=0.5.0",
 ]
 
 [build-system]
