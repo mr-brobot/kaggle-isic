@@ -9,6 +9,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import trackio
+from rich.console import Console
+from rich.table import Table
 from torch.utils.data import DataLoader
 from torcheval.metrics import (
     BinaryAccuracy,
@@ -167,51 +169,35 @@ def validate(
     )
 
     confusion_mat = confusion_matrix_metric.compute().cpu().numpy()
+    console = Console()
+    console.print(render_confusion_matrix(confusion_mat))
 
     return metrics, confusion_mat
 
 
-def training_summary(
-    confusion_mat: np.ndarray,
-) -> str:
+def render_confusion_matrix(confusion_matrix: np.ndarray) -> Table:
     """
-    Generate formatted summary for completed training session.
+    Display formatted confusion matrix for validation results.
 
     Args:
-        confusion_mat: 2x2 confusion matrix from validation
-
-    Returns:
-        Formatted training summary string
+        confusion_matrix: 2x2 confusion matrix from validation
     """
-    lines = []
-
-    lines.append("\nValidation Results:")
-    cm = confusion_mat
-    lines.append("Confusion Matrix:")
-    lines.append("                    Predicted")
-    lines.append("                Benign  Malignant  Total")
-    lines.append(
-        f"Actual Benign     {int(cm[0, 0]):4d}      {int(cm[0, 1]):4d}   {int(cm[0, 0] + cm[0, 1]):4d}"
-    )
-    lines.append(
-        f"    Malignant     {int(cm[1, 0]):4d}      {int(cm[1, 1]):4d}     {int(cm[1, 0] + cm[1, 1]):3d}"
+    table = Table(
+        title="Validation Confusion Matrix",
+        caption="Rows: Actual | Columns: Predicted",
+        show_header=True,
     )
 
-    # Calculate key medical metrics
-    if cm[1, 0] + cm[1, 1] > 0:  # If there are malignant cases
-        sensitivity = cm[1, 1] / (cm[1, 0] + cm[1, 1])
-        missed_malignant = int(cm[1, 0])
-        detected_malignant = int(cm[1, 1])
+    table.add_column("", style="dim")
+    table.add_column("Benign", justify="right")
+    table.add_column("Malignant", justify="right")
 
-        lines.append("\n🏥 CRITICAL MEDICAL METRICS:")
-        lines.append(f"• Malignant cases in validation: {int(cm[1, 0] + cm[1, 1])}")
-        lines.append(f"• Malignant cases DETECTED: {detected_malignant}")
-        lines.append(f"• Malignant cases MISSED: {missed_malignant}")
-        lines.append(f"• Sensitivity (Detection Rate): {sensitivity:.1%}")
-
-        if missed_malignant > 0:
-            lines.append(
-                f"⚠️  WARNING: {missed_malignant} malignant cases would go undiagnosed!"
-            )
-
-    return "\n".join(lines)
+    table.add_row(
+        "Benign", f"{int(confusion_matrix[0, 0]):,}", f"{int(confusion_matrix[0, 1]):,}"
+    )
+    table.add_row(
+        "Malignant",
+        f"{int(confusion_matrix[1, 0]):,}",
+        f"{int(confusion_matrix[1, 1]):,}",
+    )
+    return table

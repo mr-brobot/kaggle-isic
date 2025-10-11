@@ -1115,6 +1115,7 @@ dependencies = [
     { name = "pillow" },
     { name = "pyarrow" },
     { name = "pynvml" },
+    { name = "rich" },
     { name = "scikit-learn" },
     { name = "timm" },
     { name = "torch" },
@@ -1127,7 +1128,6 @@ dependencies = [
 dev = [
     { name = "pyrefly" },
     { name = "pytest" },
-    { name = "rich" },
     { name = "ruff" },
     { name = "typer" },
 ]
@@ -1146,6 +1146,7 @@ requires-dist = [
     { name = "pillow", specifier = ">=11.2.1" },
     { name = "pyarrow", specifier = ">=20.0.0" },
     { name = "pynvml", specifier = ">=12.0.0" },
+    { name = "rich", specifier = ">=13.6.0" },
     { name = "scikit-learn", specifier = ">=1.7.0" },
     { name = "timm", specifier = ">=1.0.15" },
     { name = "torch", specifier = ">=2.7.1" },
@@ -1158,7 +1159,6 @@ requires-dist = [
 dev = [
     { name = "pyrefly", specifier = ">=0.29.2" },
     { name = "pytest", specifier = ">=8.4.1" },
-    { name = "rich", specifier = ">=13.6.0" },
     { name = "ruff", specifier = ">=0.12.10" },
     { name = "typer", specifier = ">=0.12.0" },
 ]
