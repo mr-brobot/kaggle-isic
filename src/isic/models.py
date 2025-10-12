@@ -1,47 +1,73 @@
+from typing import Tuple
+
+import timm
 import torch
 import torch.nn as nn
-import timm
-from typing import Tuple
+
+
+class MLP(nn.Module):
+    """
+    Multi-layer perceptron with configurable architecture.
+    """
+
+    def __init__(
+        self,
+        layer_dims: list[int],
+        activation: type[nn.Module] = nn.ReLU,
+    ):
+        """
+        Args:
+            layer_dims: List of layer dimensions [input_dim, hidden1, ..., output_dim]
+            activation: Activation function class to use between layers
+        """
+        super().__init__()
+
+        if len(layer_dims) < 2:
+            raise ValueError("layer_dims must contain at least 2 dimensions")
+
+        layers = []
+        for i in range(len(layer_dims) - 1):
+            layers.append(nn.Linear(layer_dims[i], layer_dims[i + 1]))
+            layers.append(activation())
+
+        self.network = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.network(x)
 
 
 @torch.compile
-class MLP(nn.Module):
-    def __init__(self, img_size: Tuple[int, int]):
+class FusionMLPModel(nn.Module):
+    def __init__(
+        self,
+        image_shape: Tuple[int, int, int],
+        image_layer_dims: list[int],
+        metadata_layer_dims: list[int],
+        fusion_layer_dims: list[int],
+    ):
         super().__init__()
-        h, w = img_size
+        h, w, c = image_shape
 
-        self.flatten = nn.Flatten(1, -1)  # (B, H, W, 3) -> (B, 128*128*3)
         self.image_stack = nn.Sequential(
-            nn.Linear(h * w * 3, 128),  # (B, H*W*3) -> (B, 128)
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-        )
-        self.metadata_stack = nn.Sequential(
-            nn.Linear(8, 16),
-            nn.ReLU(),
-            nn.Linear(16, 32),
-            nn.ReLU(),
+            nn.Flatten(1, -1),  # (B, H, W, C) -> (B, H*W*C)
+            MLP([h * w * c] + image_layer_dims),
         )
 
-        self.output_stack = nn.Sequential(
-            nn.Linear(32 + 32, 16),
-            nn.ReLU(),
-            nn.Linear(16, 8),
-            nn.ReLU(),
-            nn.Linear(8, 1),
+        self.metadata_stack = MLP(metadata_layer_dims)
+
+        fusion_input_dim = image_layer_dims[-1] + metadata_layer_dims[-1]
+        self.fusion_head = nn.Sequential(
+            MLP([fusion_input_dim] + fusion_layer_dims),
+            nn.Linear(fusion_layer_dims[-1], 1),
         )
 
     def forward(self, x_img: torch.Tensor, x_md: torch.Tensor) -> torch.Tensor:
-        x_img = self.flatten(x_img)
         x_img = self.image_stack(x_img)
 
         x_md = self.metadata_stack(x_md)
 
         x = torch.cat([x_img, x_md], dim=1)
-        x = self.output_stack(x)
+        x = self.fusion_head(x)
         return x
 
 

@@ -59,13 +59,19 @@ def train(
         f1_metric.update(probs, targets)
 
         if batch_idx % 100 == 0:
-            current_precision = precision_metric.compute().item()
-            current_recall = recall_metric.compute().item()
+            batch_precision = precision_metric.compute().item()
+            batch_recall = recall_metric.compute().item()
             batch_loss = loss.item()
             print(
-                f"Batch {batch_idx:3d}/{len(dataloader)}: Loss: {batch_loss:.4f} | Precision: {current_precision:.3f} | Recall: {current_recall:.3f}"
+                f"Batch {batch_idx:3d}/{len(dataloader)}: Loss: {batch_loss:.4f} | Precision: {batch_precision:.3f} | Recall: {batch_recall:.3f}"
             )
-            trackio.log({"batch_loss": batch_loss})
+            trackio.log(
+                {
+                    "batch_loss": batch_loss,
+                    "batch_precision": batch_precision,
+                    "batch_recall": batch_recall,
+                }
+            )
 
     metric_tensors = torch.stack(
         [
@@ -84,7 +90,6 @@ def train(
         "precision": float(metric_values[2]),
         "recall": float(metric_values[3]),
         "f1": float(metric_values[4]),
-        "specificity": 0.0,  # TODO: implement
     }
 
     trackio.log(
@@ -153,7 +158,6 @@ def validate(
         "precision": float(metric_values[2]),
         "recall": float(metric_values[3]),
         "f1": float(metric_values[4]),
-        "specificity": 0.0,  # TODO: implement
         "roc_auc": float(metric_values[5]),
     }
 
