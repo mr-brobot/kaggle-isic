@@ -7,7 +7,9 @@ requires-python = ">=3.12"
 dependencies = [
     "aws-opentelemetry-distro>=0.12.1",
     "boto3>=1.40.46",
+    "datasets>=4.2.0",
     "h5py>=3.14.0",
+    "huggingface-hub>=0.35.3",
     "ipywidgets>=8.1.7",
     "kaggle>=1.7.4.5",
     "matplotlib>=3.10.3",
@@ -18,7 +20,7 @@ dependencies = [
     "pyarrow>=20.0.0",
     "pynvml>=12.0.0",
     "rich>=13.6.0",
-    "scikit-learn>=1.7.0",
+    "scikit-learn>=1.7.2",
     "timm>=1.0.15",
     "torch>=2.7.1",
     "torcheval>=0.0.7",
@@ -31,9 +33,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = [
-    "pyrefly>=0.29.2",
-    "pytest>=8.4.1",
-    "ruff>=0.12.10",
-    "typer>=0.12.0",
-]
+dev = ["pyrefly>=0.29.2", "pytest>=8.4.1", "ruff>=0.12.10", "typer>=0.12.0"]

@@ -34,6 +34,8 @@
     },
     "mounts": [
         "source=${localEnv:HOME}${localEnv:USERPROFILE}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached",
+        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.cache,target=/home/vscode/.cache,type=bind,consistency=cached",
+        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.config,target=/home/vscode/.config,type=bind,consistency=cached",
         "source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/home/vscode/.claude,type=bind,consistency=cached"
     ],
     "containerEnv": {
