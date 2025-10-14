@@ -770,6 +770,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/91/9e/0bbbd09b116fd8ee2d3617e28e6598551d2f0f24d3a2ce99cc87ec85aeb0/datasets-4.2.0-py3-none-any.whl", hash = "sha256:fdc43aaf4a73b31f64f80f72f195ab413a1141ed15555d675b2fd17926f8b026", size = 506316, upload-time = "2025-10-09T16:10:13.375Z" },
 ]
 
+[package.optional-dependencies]
+vision = [
+    { name = "pillow" },
+]
+
 [[package]]
 name = "debugpy"
 version = "1.8.14"
@@ -1340,7 +1345,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aws-opentelemetry-distro" },
     { name = "boto3" },
-    { name = "datasets" },
+    { name = "datasets", extra = ["vision"] },
     { name = "h5py" },
     { name = "huggingface-hub" },
     { name = "ipywidgets" },
@@ -1373,7 +1378,7 @@ dev = [
 requires-dist = [
     { name = "aws-opentelemetry-distro", specifier = ">=0.12.1" },
     { name = "boto3", specifier = ">=1.40.46" },
-    { name = "datasets", specifier = ">=4.2.0" },
+    { name = "datasets", extras = ["vision"], specifier = ">=4.2.0" },
     { name = "h5py", specifier = ">=3.14.0" },
     { name = "huggingface-hub", specifier = ">=0.35.3" },
     { name = "ipywidgets", specifier = ">=8.1.7" },

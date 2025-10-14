@@ -2,7 +2,7 @@
 
 ## Dataset
 
-This project uses the competition dataset via HuggingFace datasets. Review the Kaggle-HuggingFace conversion in the [Dataset notebook](nbs/dataset.ipynb). Review [the EDA notebook](nbs/eda.ipynb) to learn more about the dataset.
+This project uses the Kaggle competition dataset via HuggingFace datasets. Review the conversion in [the Dataset notebook](nbs/dataset.ipynb), the dataset [on Huggingface](https://huggingface.co/datasets/mrbrobot/isic-2024), and [the EDA notebook](nbs/eda.ipynb) to learn more.
 
 ## OpenTelemetry
 
