@@ -1,8 +1,11 @@
-AWS_REGION ?= $(shell aws configure list | grep region | awk '{print $$2}')
+AWS_REGION ?= $(shell aws configure list | grep region | awk '{print $$3}')
 
-.PHONY: bench check format trackio
+.PHONY: bootstrap bench check format trackio
 
-bench:
+bootstrap:
+	uv run opentelemetry-bootstrap -a requirements | uv pip install --requirement -
+
+bench: bootstrap
 	@if [ -z "$(AWS_REGION)" ]; then \
 		echo "Warning: AWS region not configured. Traces will not be sent to X-Ray."; \
 		uv run opentelemetry-instrument python scripts/bench.py --batches 100 --batch-size 128; \
