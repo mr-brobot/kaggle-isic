@@ -1,186 +1,50 @@
-import io
-import warnings
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple
 
-import h5py
-import pandas as pd
+import numpy as np
+import pyarrow as pa
 import torch
 import torchvision.transforms.v2 as T
-from cryptography.utils import cached_property
-from PIL.Image import Image as PILImage
-from sklearn.preprocessing import (
-    MinMaxScaler,
-    OneHotEncoder,
-)
-from torch.utils.data import Dataset
+from datasets import Dataset
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 
 
-@dataclass
-class ISICDataset(Dataset):
-    """
-    ISIC Dataset for multimodal skin cancer detection.
-    """
-
-    hdf5_path: Path
-    metadata_path: Path
-    _hdf5_file: Optional[h5py.File] = None
-    _metadata: Optional[pd.DataFrame] = None
-
-    @property
-    def metadata(self) -> pd.DataFrame:
-        if self._metadata is None:
-            self._metadata = pd.read_csv(self.metadata_path, low_memory=False)
-        return self._metadata
-
-    @property
-    def is_open(self) -> bool:
-        """Check if the HDF5 file is currently open."""
-        return self._hdf5_file is not None
-
-    def open(self) -> "ISICDataset":
-        """Open the HDF5 file for reading."""
-        if self._hdf5_file is not None:
-            warnings.warn("Dataset is already open")
-            return self
-
-        self._hdf5_file = h5py.File(self.hdf5_path, "r")
-        return self
-
-    def close(self) -> None:
-        """Close the HDF5 file if it's open."""
-        if self.is_open and self._hdf5_file:
-            self._hdf5_file.close()
-            self._hdf5_file = None
-
-    def __enter__(self) -> "ISICDataset":
-        """Context manager entry."""
-        return self.open()
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Context manager exit with cleanup."""
-        self.close()
-        # Return None to propagate any exception
-
-    def image(self, key: str) -> PILImage:
-        from PIL import Image
-
-        if self._hdf5_file is None:
-            raise RuntimeError(
-                "Dataset is not open. Use 'with ISICDataset(...) as ds:' "
-                "or call ds.open() before accessing images."
-            )
-
-        b = io.BytesIO(self._hdf5_file[key][()])
-        return Image.open(b)
-
-    def row(self, idx: int) -> pd.Series:
-        return self.metadata.iloc[idx]
-
-    def __len__(self):
-        return len(self.metadata)
-
-    @cached_property
-    def pos_weight(self) -> float:
-        """
-        Positive class weight for BCEWithLogitsLoss.
-
-        Calculated as neg_count / pos_count to handle class imbalance.
-        """
-        targets = self.metadata["target"]
-        neg_count = (targets == 0).sum()
-        pos_count = (targets == 1).sum()
-        return neg_count / pos_count
-
-    def __getitem__(self, idx: int) -> Tuple[pd.Series, PILImage, int]:
-        if type(idx) is not int:
-            raise ValueError(f"ISICDataset: Unexpected index type {idx} ({type(idx)})")
-
-        # ensure int for pandas compat
-        idx = int(idx)
-        row = self.row(idx)
-
-        key = row["isic_id"]
-        image = self.image(key)
-
-        return row, image, row["target"]
-
-
-@dataclass
 class ImageEncoder:
-    """
-    Image encoder that handles resizing and normalization for sequences of PIL Images.
-    """
+    """Transform images with torchvision."""
 
-    image_size: Tuple[int, int]
-
-    @cached_property
-    def transform(self) -> T.Transform:
-        return T.Compose(
+    def __init__(self, image_size: Tuple[int, int] = (128, 128)):
+        self.transform = T.Compose(
             [
-                T.ToImage(),
-                T.Resize(
-                    size=self.image_size,
-                    interpolation=T.InterpolationMode.BICUBIC,
-                ),
+                T.ToImage(),  # convert PIL images to tensors
+                T.Resize(size=image_size, interpolation=T.InterpolationMode.BICUBIC),
                 T.ToDtype(dtype=torch.float32, scale=True),
             ]
         )
 
-    def __call__(self, images: Sequence[PILImage]) -> torch.Tensor:
-        """
-        Encode a sequence of images as a tensor
-
-        Images are resized & normalized
-
-        Args:
-            images: Sequence of PIL Images to process
-
-        Returns:
-            torch.Tensor: Batch tensor with shape (N, C, H, W) where N is the number of images
-        """
-        results = self.transform(images)
-        return torch.stack(results)
+    def __call__(self, dataset: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform dataset, to be used with `Dataset.with_transform."""
+        dataset["image"] = self.transform(dataset["image"])
+        return dataset
 
 
 @dataclass
 class MetadataEncoder:
-    """
-    Metadata encoder that handles preprocessing and encoding for metadata.
-    """
+    """Encode metadata features with sklearn transformers."""
 
     age_scaler: Optional[MinMaxScaler] = None
     sex_encoder: Optional[OneHotEncoder] = None
     anatom_site_general_encoder: Optional[OneHotEncoder] = None
-    _is_fitted: bool = False
 
-    def fit(self, metadata: pd.DataFrame) -> "MetadataEncoder":
-        """
-        Fit encoders and scaler on the full metadata DataFrame.
+    def fit(self, dataset: Dataset) -> "MetadataEncoder":
+        """Fit sklearn encoders on dataset."""
+        meta = dataset.to_pandas()[["age_approx", "sex", "anatom_site_general"]]
+        meta["age_approx"] = meta["age_approx"].fillna(0)
 
-        Args:
-            metadata: Full metadata DataFrame to fit transformers on
-
-        Returns:
-            self: For method chaining
-        """
-        # fit age scaler
-        age_df = metadata[["age_approx"]].copy()
-        age_df["age_approx"] = pd.to_numeric(
-            age_df["age_approx"], errors="coerce"
-        ).fillna(0)
-        self.age_scaler = MinMaxScaler()
-        self.age_scaler.fit(age_df)
-
-        # fit sex encoder
+        self.age_scaler = MinMaxScaler().fit(meta["age_approx"].values.reshape(-1, 1))
         self.sex_encoder = OneHotEncoder(
             categories=[["male", "female"]], handle_unknown="ignore"
-        )
-        self.sex_encoder.fit(metadata[["sex"]])
-
-        # fit anatom_site_general encoder
-        self.anatom_site_general_encoder = OneHotEncoder(
+        ).fit(meta["sex"].values.reshape(-1, 1))
+        self.site_encoder = OneHotEncoder(
             categories=[
                 [
                     "head/neck",
@@ -191,83 +55,69 @@ class MetadataEncoder:
                 ]
             ],
             handle_unknown="ignore",
-        )
-        self.anatom_site_general_encoder.fit(metadata[["anatom_site_general"]])
+        ).fit(meta["anatom_site_general"].values.reshape(-1, 1))
 
-        self._is_fitted = True
         return self
 
-    def __call__(self, df: pd.DataFrame) -> torch.Tensor:
+    def __call__(self, batch: pa.Table) -> pa.Table:
         """
-        Encode metadata into tensor using fitted transformers.
+        Encode batched metadata examples for use with .map(batched=True).
 
         Args:
-            df: Metadata to encode
+            batch: PyArrow Table with all columns including metadata columns to encode
 
         Returns:
-            torch.Tensor: Encoded metadata with shape (N, 8)
+            PyArrow Table with encoded metadata columns replacing the original columns
         """
-        if not self._is_fitted:
-            raise ValueError(
-                "MetadataEncoder must be fitted before use. Call fit() first."
+        if not self.age_scaler or not self.sex_encoder or not self.site_encoder:
+            raise ValueError("Column encoders missing, must call fit() before encoding")
+
+        ages = batch["age_approx"].to_numpy().reshape(-1, 1)
+        ages = np.nan_to_num(ages, nan=0.0)
+        sexes = batch["sex"].to_numpy().reshape(-1, 1)
+        sites = batch["anatom_site_general"].to_numpy().reshape(-1, 1)
+
+        age_scaled = self.age_scaler.transform(ages)  # (n, 1)
+        sex_encoded = self.sex_encoder.transform(sexes).toarray()  # (n, 2)
+        site_encoded = self.site_encoder.transform(sites).toarray()  # (n, 5)
+
+        batch = batch.drop(["age_approx", "sex", "anatom_site_general"])
+        batch = batch.append_column("age_approx", pa.array(age_scaled.flatten()))
+        batch = batch.append_column("sex", pa.array(sex_encoded.tolist()))
+        batch = batch.append_column(
+            "anatom_site_general", pa.array(site_encoded.tolist())
+        )
+
+        return batch
+
+
+def collate_batch(
+    batch: Sequence[Dict[str, torch.Tensor]],
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Simple collate function - just stack pre-processed tensors.
+
+    Args:
+        batch: List of dicts with keys ["image", "age_approx", "sex", "anatom_site_general", "target"]
+
+    Returns:
+        Tuple of (images, metadata, targets)
+    """
+    images = torch.stack([ex["image"] for ex in batch])
+
+    metadata = torch.stack(
+        [
+            torch.cat(
+                [
+                    torch.tensor([ex["age_approx"]], dtype=torch.float32),
+                    torch.tensor(ex["sex"], dtype=torch.float32),
+                    torch.tensor(ex["anatom_site_general"], dtype=torch.float32),
+                ]
             )
+            for ex in batch
+        ]
+    )
 
-        df = df[["age_approx", "sex", "anatom_site_general"]].copy()
+    targets = torch.stack([torch.tensor(ex["target"]) for ex in batch]).float()
 
-        # age_approx: convert, impute, normalize using fitted scaler
-        df.loc[:, "age_approx"] = pd.to_numeric(
-            df["age_approx"], errors="coerce"
-        ).fillna(0)
-        age_scaled = self.age_scaler.transform(df[["age_approx"]])
-        df.loc[:, "age_approx"] = age_scaled.flatten()
-
-        # sex: one-hot encode using fitted encoder
-        one_hot_sex = self.sex_encoder.transform(df[["sex"]]).toarray()
-        for i, category in enumerate(self.sex_encoder.categories_[0]):
-            df[f"is_{category}"] = one_hot_sex[:, i]
-        df = df.drop(columns=["sex"])
-
-        # anatom_site_general: one-hot encode using fitted encoder
-        one_hot_anatom_site_general = self.anatom_site_general_encoder.transform(
-            df[["anatom_site_general"]]
-        ).toarray()
-        for i, category in enumerate(self.anatom_site_general_encoder.categories_[0]):
-            df[f"anatom_site_general_is_{category}"] = one_hot_anatom_site_general[:, i]
-        df = df.drop(columns=["anatom_site_general"])
-
-        # ensure all columns are numeric and return tensor
-        df = df.astype(float)
-        return torch.tensor(df.values, dtype=torch.float32)
-
-
-@dataclass
-class BatchEncoder:
-    """
-    Batch encoder that orchestrates image and metadata encoding for training batches.
-    """
-
-    image_encoder: ImageEncoder
-    metadata_encoder: MetadataEncoder
-
-    def __call__(
-        self, batch: Sequence[Tuple[pd.Series, PILImage, str]]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Process batch of (metadata, image, target) tuples.
-
-        Args:
-            batch: Sequence of (metadata_row, image, target) tuples
-
-        Returns:
-            Tuple of (image_tensor, metadata_tensor, target_tensor)
-        """
-        rows, images, targets = zip(*batch)
-
-        df = pd.DataFrame(rows)
-
-        # encode using fitted encoders
-        x_imgs = self.image_encoder(images)
-        x_mds = self.metadata_encoder(df)
-        y = torch.tensor(targets, dtype=torch.float32)
-
-        return x_imgs, x_mds, y
+    return images, metadata, targets

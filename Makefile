@@ -20,6 +20,3 @@ check:
 
 format:
 	uv run --group dev ruff format .
-
-trackio:
-	uv run trackio show
