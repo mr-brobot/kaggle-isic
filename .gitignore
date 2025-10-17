@@ -176,9 +176,9 @@ cython_debug/
 # downloaded data
 data/*
 
-# wandb
-**/wandb/*
-
 # claude
 .claude
 .mcp.json
+
+# huggingface
+trainer_output

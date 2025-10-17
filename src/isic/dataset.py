@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from textwrap import dedent
 from typing import Any, Dict, Optional, Sequence, Tuple
 
 import numpy as np
@@ -7,6 +8,7 @@ import torch
 import torchvision.transforms.v2 as T
 from datasets import Dataset
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from transformers import ProcessorMixin
 
 
 class ImageEncoder:
@@ -25,6 +27,84 @@ class ImageEncoder:
         """Transform dataset, to be used with `Dataset.with_transform."""
         dataset["image"] = self.transform(dataset["image"])
         return dataset
+
+
+class MessagesFormatter:
+    """Format image and text into VLM messages structure."""
+
+    def __call__(self, batch: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Add 'messages' field with VLM chat format.
+
+        Args:
+            batch: Batch dict where each value is a list
+
+        Returns:
+            Batch dict with added 'messages' field
+        """
+        result = []
+
+        for image, text in zip(batch["image"], batch["text"]):
+            messages = [
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Classify provided example as benign or malignant.",
+                        },
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": image},
+                        {"type": "text", "text": text},
+                    ],
+                },
+            ]
+            result.append(messages)
+
+        batch["messages"] = result
+        return batch
+
+
+class MetadataTextFormatter:
+    """Format metadata fields as markdown table for VLM."""
+
+    def __call__(self, batch: pa.Table) -> pa.Table:
+        """
+        Add 'text' column with formatted metadata as markdown tables.
+
+        Args:
+            batch: PyArrow Table with metadata columns
+
+        Returns:
+            PyArrow Table with added 'text' column containing markdown tables
+        """
+        ages = batch["age_approx"].to_pylist()
+        sexes = batch["sex"].to_pylist()
+        sites = batch["anatom_site_general"].to_pylist()
+
+        texts = []
+        for age, sex, site in zip(ages, sexes, sites):
+            # format values, explicitly stating when unknown
+            age_str = f"{int(age)} years" if age else "unknown"
+            sex_str = sex if sex else "unknown"
+            site_str = site if site else "unknown"
+
+            # build markdown table
+            text = dedent(f"""
+            | Field | Value |
+            |-------|-------|
+            | Age | {age_str} |
+            | Sex | {sex_str} |
+            | Lesion Site | {site_str} |
+            """).strip()
+
+            texts.append(text)
+
+        return batch.append_column("text", pa.array(texts))
 
 
 @dataclass
@@ -121,3 +201,42 @@ def collate_batch(
     targets = torch.stack([torch.tensor(ex["target"]) for ex in batch]).float()
 
     return images, metadata, targets
+
+
+class VLMCollator:
+    """Collate function that applies VLM processor to batch for HuggingFace Trainer."""
+
+    processor: ProcessorMixin
+
+    def __init__(self, processor: ProcessorMixin) -> None:
+        """
+        Initialize collator with VLM processor.
+
+        Args:
+            processor: VLM processor instance
+        """
+        self.processor = processor
+
+    def __call__(self, batch: Sequence[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+        """
+        Apply processor to batch and format for HuggingFace Trainer.
+
+        Args:
+            batch: List of dicts with keys ["messages", "target"]
+
+        Returns:
+            Dict with processed inputs and labels
+        """
+        messages_list = [ex["messages"] for ex in batch]
+        targets = torch.tensor([ex["target"] for ex in batch], dtype=torch.float32)
+
+        inputs = self.processor.apply_chat_template(
+            messages_list,
+            tokenize=True,
+            add_generation_prompt=False,
+            return_dict=True,
+            return_tensors="pt",
+            padding=True,
+        )
+
+        return inputs | {"labels": targets}
