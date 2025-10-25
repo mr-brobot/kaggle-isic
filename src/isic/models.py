@@ -12,12 +12,14 @@ class MLP(nn.Module):
     def __init__(
         self,
         layer_dims: Sequence[int],
-        activation: type[nn.Module] = nn.ReLU,
+        activation: type[nn.Module] = nn.LeakyReLU,
+        batch_norm: bool = False,
     ):
         """
         Args:
             layer_dims: List of layer dimensions [input_dim, hidden1, ..., output_dim]
             activation: Activation function class to use between layers
+            batch_norm: Whether to apply batch normalization after each linear layer
         """
         super().__init__()
 
@@ -27,6 +29,8 @@ class MLP(nn.Module):
         layers = []
         for i in range(len(layer_dims) - 1):
             layers.append(nn.Linear(layer_dims[i], layer_dims[i + 1]))
+            if batch_norm:
+                layers.append(nn.BatchNorm1d(layer_dims[i + 1]))
             layers.append(activation())
 
         self.network = nn.Sequential(*layers)
@@ -93,7 +97,7 @@ class FusionModel(nn.Module):
 
         fusion_input_dim = cnn_output_features + metadata_layer_dims[-1]
         self.fusion_head = nn.Sequential(
-            MLP([fusion_input_dim] + fusion_layer_dims),
+            MLP([fusion_input_dim] + fusion_layer_dims, batch_norm=True),
             nn.Linear(fusion_layer_dims[-1], 1),
         )
 
