@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 import trackio
 from rich.console import Console
+from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from torch.utils.data import DataLoader
 from torcheval.metrics import (
@@ -29,9 +30,13 @@ def train(
     optimizer: optim.Optimizer,
     device: torch.device,
     threshold: float = 0.5,
+    console: Console | None = None,
 ) -> Dict[str, float]:
     model.train()
     total_loss = torch.tensor(0.0, device=device)
+
+    if console is None:
+        console = Console()
 
     # init metrics
     accuracy_metric = BinaryAccuracy(threshold=threshold, device=device)
@@ -39,38 +44,52 @@ def train(
     recall_metric = BinaryRecall(threshold=threshold, device=device)
     f1_metric = BinaryF1Score(threshold=threshold, device=device)
 
-    for batch_idx, (x_img, x_md, targets) in enumerate(dataloader):
-        x_img, x_md, targets = x_img.to(device), x_md.to(device), targets.to(device)
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TextColumn("({task.completed}/{task.total})"),
+        TextColumn("Loss: [cyan]{task.fields[loss]:.4f}"),
+        TextColumn("Prec: [green]{task.fields[precision]:.3f}"),
+        TextColumn("Rec: [yellow]{task.fields[recall]:.3f}"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task(
+            "Training", total=len(dataloader), loss=0.0, precision=0.0, recall=0.0
+        )
 
-        optimizer.zero_grad()
-        logits = model(x_img, x_md).squeeze()
-        loss = criterion(logits, targets)
-        loss.backward()
-        optimizer.step()
+        for batch_idx, (x_img, x_md, targets) in enumerate(dataloader):
+            x_img, x_md, targets = x_img.to(device), x_md.to(device), targets.to(device)
 
-        total_loss += loss.detach()
+            optimizer.zero_grad()
+            logits = model(x_img, x_md).squeeze()
+            loss = criterion(logits, targets)
+            loss.backward()
+            optimizer.step()
 
-        probs = torch.sigmoid(logits)
+            total_loss += loss.detach()
 
-        # update metrics
-        accuracy_metric.update(probs, targets)
-        precision_metric.update(probs, targets)
-        recall_metric.update(probs, targets.int())  # https://github.com/pytorch/torcheval/issues/209 # fmt: skip
-        f1_metric.update(probs, targets)
+            probs = torch.sigmoid(logits)
 
-        if batch_idx % 100 == 0:
-            batch_precision = precision_metric.compute().item()
-            batch_recall = recall_metric.compute().item()
-            batch_loss = loss.item()
-            print(
-                f"Batch {batch_idx:3d}/{len(dataloader)}: Loss: {batch_loss:.4f} | Precision: {batch_precision:.3f} | Recall: {batch_recall:.3f}"
+            accuracy_metric.update(probs, targets)
+            precision_metric.update(probs, targets)
+            recall_metric.update(probs, targets.int())  # https://github.com/pytorch/torcheval/issues/209 # fmt: skip
+            f1_metric.update(probs, targets)
+
+            # only compute recall if we've seen positive samples (avoids NaN warnings)
+            recall_value = (
+                recall_metric.compute().item()
+                if recall_metric.num_true_labels > 0  # type: ignore[attr-defined]
+                else 0.0
             )
-            trackio.log(
-                {
-                    "batch_loss": batch_loss,
-                    "batch_precision": batch_precision,
-                    "batch_recall": batch_recall,
-                }
+
+            progress.update(
+                task,
+                advance=1,
+                loss=(total_loss / (batch_idx + 1)).item(),
+                precision=precision_metric.compute().item(),
+                recall=recall_value,
             )
 
     metric_tensors = torch.stack(
@@ -112,9 +131,13 @@ def validate(
     criterion: nn.Module,
     device: torch.device,
     threshold: float = 0.5,
+    console: Console | None = None,
 ) -> tuple[Dict[str, float], np.ndarray]:
     model.eval()
     total_loss = torch.tensor(0.0, device=device)
+
+    if console is None:
+        console = Console()
 
     accuracy_metric = BinaryAccuracy(threshold=threshold, device=device)
     precision_metric = BinaryPrecision(threshold=threshold, device=device)
@@ -123,22 +146,53 @@ def validate(
     auroc_metric = BinaryAUROC(device=device)
     confusion_matrix_metric = BinaryConfusionMatrix(threshold=threshold, device=device)
 
-    for x_img, x_md, targets in dataloader:
-        x_img, x_md, targets = x_img.to(device), x_md.to(device), targets.to(device)
-        logits = model(x_img, x_md).squeeze()
-        loss = criterion(logits, targets)
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TextColumn("({task.completed}/{task.total})"),
+        TextColumn("Loss: [cyan]{task.fields[loss]:.4f}"),
+        TextColumn("Prec: [green]{task.fields[precision]:.3f}"),
+        TextColumn("Rec: [yellow]{task.fields[recall]:.3f}"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task(
+            "Validation", total=len(dataloader), loss=0.0, precision=0.0, recall=0.0
+        )
 
-        total_loss += loss.detach()
+        for batch_idx, (x_img, x_md, targets) in enumerate(dataloader):
+            x_img, x_md, targets = x_img.to(device), x_md.to(device), targets.to(device)
+            logits = model(x_img, x_md).squeeze()
+            loss = criterion(logits, targets)
 
-        probs = torch.sigmoid(logits)
+            total_loss += loss.detach()
 
-        # update metrics
-        accuracy_metric.update(probs, targets)
-        precision_metric.update(probs, targets)
-        recall_metric.update(probs, targets.int())  # https://github.com/pytorch/torcheval/issues/209 # fmt: skip
-        f1_metric.update(probs, targets)
-        auroc_metric.update(probs, targets)
-        confusion_matrix_metric.update(probs, targets.int())
+            probs = torch.sigmoid(logits)
+
+            # update metrics
+            accuracy_metric.update(probs, targets)
+            precision_metric.update(probs, targets)
+            recall_metric.update(probs, targets.int())  # https://github.com/pytorch/torcheval/issues/209 # fmt: skip
+            f1_metric.update(probs, targets)
+            auroc_metric.update(probs, targets)
+            confusion_matrix_metric.update(probs, targets.int())
+
+            # only compute recall if we've seen positive samples (avoids NaN warnings)
+            recall_value = (
+                recall_metric.compute().item()
+                if recall_metric.num_true_labels > 0  # type: ignore[attr-defined]
+                else 0.0
+            )
+
+            # update progress bar
+            progress.update(
+                task,
+                advance=1,
+                loss=(total_loss / (batch_idx + 1)).item(),
+                precision=precision_metric.compute().item(),
+                recall=recall_value,
+            )
 
     metric_tensors = torch.stack(
         [
@@ -173,7 +227,6 @@ def validate(
     )
 
     confusion_mat = confusion_matrix_metric.compute().cpu().numpy()
-    console = Console()
     console.print(render_confusion_matrix(confusion_mat))
 
     return metrics, confusion_mat

@@ -51,7 +51,6 @@ class FusionModel(nn.Module):
         cnn_layers: Sequence[tuple[int, int, bool]],
         metadata_layer_dims: Sequence[int],
         fusion_layer_dims: Sequence[int],
-        activation: type[nn.Module] = nn.ReLU,
     ):
         """
         Args:
@@ -78,7 +77,7 @@ class FusionModel(nn.Module):
                 )
             )
             cnn_modules.append(nn.BatchNorm2d(out_channels))
-            cnn_modules.append(activation())
+            cnn_modules.append(nn.SiLU())
 
             if pool:
                 cnn_modules.append(nn.MaxPool2d(kernel_size=2, stride=2))
