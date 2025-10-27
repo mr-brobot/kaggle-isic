@@ -77,7 +77,7 @@ def train(
             recall_metric.update(probs, targets.int())  # https://github.com/pytorch/torcheval/issues/209 # fmt: skip
             f1_metric.update(probs, targets)
 
-            # only compute recall if we've seen positive samples (avoids NaN warnings)
+            # only compute recall if we've seen positive samples (avoids division by zero)
             recall_value = (
                 recall_metric.compute().item()
                 if recall_metric.num_true_labels > 0  # type: ignore[attr-defined]
@@ -113,11 +113,11 @@ def train(
 
     trackio.log(
         {
-            "train_loss": metrics["loss"],
-            "train_accuracy": metrics["accuracy"],
-            "train_precision": metrics["precision"],
-            "train_recall": metrics["recall"],
-            "train_f1": metrics["f1"],
+            "train/loss": metrics["loss"],
+            "train/accuracy": metrics["accuracy"],
+            "train/precision": metrics["precision"],
+            "train/recall": metrics["recall"],
+            "train/f1": metrics["f1"],
         }
     )
 
@@ -217,12 +217,12 @@ def validate(
 
     trackio.log(
         {
-            "val_loss": metrics["loss"],
-            "val_accuracy": metrics["accuracy"],
-            "val_precision": metrics["precision"],
-            "val_recall": metrics["recall"],
-            "val_f1": metrics["f1"],
-            "val_roc_auc": metrics["roc_auc"],
+            "val/loss": metrics["loss"],
+            "val/accuracy": metrics["accuracy"],
+            "val/precision": metrics["precision"],
+            "val/recall": metrics["recall"],
+            "val/f1": metrics["f1"],
+            "val/roc_auc": metrics["roc_auc"],
         }
     )
 

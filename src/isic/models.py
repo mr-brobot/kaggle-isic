@@ -9,12 +9,7 @@ class MLP(nn.Module):
     Multi-layer perceptron with configurable architecture.
     """
 
-    def __init__(
-        self,
-        layer_dims: Sequence[int],
-        activation: type[nn.Module] = nn.LeakyReLU,
-        batch_norm: bool = False,
-    ):
+    def __init__(self, layer_dims: Sequence[int], batch_norm: bool = False):
         """
         Args:
             layer_dims: List of layer dimensions [input_dim, hidden1, ..., output_dim]
@@ -31,7 +26,7 @@ class MLP(nn.Module):
             layers.append(nn.Linear(layer_dims[i], layer_dims[i + 1]))
             if batch_norm:
                 layers.append(nn.BatchNorm1d(layer_dims[i + 1]))
-            layers.append(activation())
+            layers.append(nn.SiLU())
 
         self.network = nn.Sequential(*layers)
 
