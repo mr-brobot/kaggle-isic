@@ -182,3 +182,5 @@ data/*
 
 # huggingface
 trainer_output
+
+scratch/

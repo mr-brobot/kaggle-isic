@@ -3,31 +3,31 @@ name = "isic"
 version = "0.1.0"
 description = "https://www.kaggle.com/competitions/isic-2024-challenge"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
-    "accelerate>=1.10.1",
-    "aws-opentelemetry-distro>=0.12.1",
-    "boto3>=1.40.46",
-    "datasets[vision]>=4.2.0",
-    "h5py>=3.14.0",
-    "huggingface-hub>=0.35.3",
-    "ipywidgets>=8.1.7",
-    "kaggle>=1.7.4.5",
-    "matplotlib>=3.10.3",
-    "notebook>=7.4.3",
-    "numpy>=2.3.0",
-    "pandas>=2.3.0",
-    "pillow>=11.2.1",
-    "pyarrow>=20.0.0",
-    "pynvml>=12.0.0",
-    "rich>=13.6.0",
-    "scikit-learn>=1.7.2",
-    "timm>=1.0.15",
-    "torch>=2.7.1",
+    "accelerate>=1.13.0",
+    "aws-opentelemetry-distro>=0.17.0",
+    "boto3>=1.43.8",
+    "datasets[vision]>=4.8.5",
+    "h5py>=3.16.0",
+    "huggingface-hub>=1.15.0",
+    "ipywidgets>=8.1.8",
+    "kaggle>=2.1.2",
+    "matplotlib>=3.10.9",
+    "notebook>=7.5.6",
+    "numpy>=2.4.4",
+    "pandas>=3.0.3",
+    "pillow>=12.2.0",
+    "pyarrow>=24.0.0",
+    "pynvml>=13.0.1",
+    "rich>=15.0.0",
+    "scikit-learn>=1.8.0",
+    "timm>=1.0.27",
+    "torch>=2.12.0",
     "torcheval>=0.0.7",
-    "torchvision>=0.22.1",
-    "trackio>=0.5.0",
-    "transformers>=4.57.1",
+    "torchvision>=0.27.0",
+    "trackio>=0.25.1",
+    "transformers>=5.8.1",
 ]
 
 [build-system]
@@ -35,4 +35,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["pyrefly>=0.29.2", "pytest>=8.4.1", "ruff>=0.12.10", "typer>=0.12.0"]
+dev = [
+    "jupytext>=1.19.2",
+    "pyrefly>=1.0.0",
+    "pytest>=9.0.3",
+    "ruff>=0.15.13",
+    "typer>=0.25.1",
+]

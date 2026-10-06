@@ -8,7 +8,7 @@ This is a machine learning project for the ISIC 2024 Skin Cancer Detection chall
 
 This project uses the [ISIC 2024 dataset on HuggingFace](https://huggingface.co/datasets/mrbrobot/isic-2024), converted from the original Kaggle competition data:
 
-- Current format: HuggingFace Dataset with PyArrow backend
+- Format: HuggingFace Dataset
 - Dataset: `mrbrobot/isic-2024` (401,059 training samples)
 - Images: Square dimensions 41x41 to 269x269 pixels (most 100x100-150x150)
 - Metadata: 55 columns including demographics and medical features
@@ -19,63 +19,53 @@ This project uses the [ISIC 2024 dataset on HuggingFace](https://huggingface.co/
 
 ### ML/Data
 
-- **PyTorch**: Primary ML framework (>=2.7.1)
-- **torchvision**: Image transformations (>=0.22.1)
-- **torcheval**: Evaluation metrics (>=0.0.7)
-- **transformers**: HuggingFace models and VLMs (>=4.57.1)
-- **datasets[vision]**: HuggingFace datasets with vision support (>=4.2.0)
-- **accelerate**: Distributed training support (>=1.10.1)
-- **h5py**: Legacy HDF5 file support (>=3.14.0)
-- **pandas**: Data manipulation (>=2.3.0)
-- **scikit-learn**: Preprocessing utilities (>=1.7.2)
-- **PIL/Pillow**: Image processing (>=11.2.1)
-- **matplotlib**: Visualization (>=3.10.3)
-- **numpy**: Numerical operations (>=2.3.0)
-- **pyarrow**: Efficient data serialization (>=20.0.0)
+- **PyTorch**: Primary ML framework
+- **torchvision**: Image transformations
+- **torcheval**: Evaluation metrics
+- **transformers**: HuggingFace models and VLMs
+- **datasets[vision]**: HuggingFace datasets with vision support
+- **accelerate**: Distributed training support
+- **h5py**: Legacy HDF5 file support
+- **pandas**: Data manipulation
+- **scikit-learn**: Preprocessing utilities
+- **PIL/Pillow**: Image processing
+- **matplotlib**: Visualization
+- **numpy**: Numerical operations
+- **pyarrow**: Efficient data serialization
 
 ### Infrastructure
 
-- **AWS SDK (boto3)**: AWS service integration (>=1.40.46)
-- **pynvml**: NVIDIA GPU monitoring (>=12.0.0)
+- **AWS SDK (boto3)**: AWS service integration
+- **pynvml**: NVIDIA GPU monitoring
 
 ### Experiment Tracking
 
-- **trackio**: Lightweight experiment tracking (>=0.5.0)
+- **trackio**: Lightweight experiment tracking
 
 ### Observability
 
-- **AWS Distro for OpenTelemetry (ADOT)**: Collector-less setup with direct export to AWS X-Ray (>=0.12.1)
+- **AWS Distro for OpenTelemetry (ADOT)**: Collector-less setup with direct export to AWS X-Ray
 - **Auto-instrumentation**: Scripts only (notebooks require manual instrumentation)
 - **Configuration**: X-Ray endpoint auto-configured based on AWS region
 
 ### UI/CLI
 
-- **rich**: Terminal formatting and progress bars (>=13.6.0)
-- **typer**: CLI framework (>=0.12.0)
-- **notebook**: Jupyter notebook interface (>=7.4.3)
-- **ipywidgets**: Interactive notebook widgets (>=8.1.7)
+- **rich**: Terminal formatting and progress bars
+- **typer**: CLI framework
+- **notebook**: Jupyter notebook interface
+- **ipywidgets**: Interactive notebook widgets
 
 ### Development Tools
 
-- **ruff**: Fast Python linter and formatter (>=0.12.10)
-- **pyrefly**: Type checking (>=0.29.2)
-- **pytest**: Testing framework (>=8.4.1)
+- **ruff**: Fast Python linter and formatter
+- **pyrefly**: Type checking
+- **pytest**: Testing framework
 
 ## Development Environment
 
 - Python >=3.12 required
-- CUDA support available (code checks for GPU)
-- Uses `uv` for dependency management (uv.lock present)
-- Makefile for common development tasks (see Make Commands section)
-
-## Code Style
-
-- **Design Philosophy**: Prefer simplicity and elegance over complexity; strive for concise, elegant, and readable code; every line of code should have clear and articulable value
-- **Strong Typing**: Use strict type checking and make types explicit; rely on the the type system to prevent errors
-- **Functional Programming**: Prefer pure functions over classes; separate side effects and mutations
-- **Testing Philosophy**: Focus tests on logic that the type system cannot verify; aim for meaningful test coverage rather than arbitrary metrics
-- **Error Handling**: Only catch exceptions when you can meaningfully recover or transform; avoid empty catch-log-reraise patterns that add more noise than value
-- **Comments**: Only use inline comments to explain context that is not obvious; avoid excessive comments as they add noise; prefer extracting complex logic into well-named functions.
+- CUDA support available
+- Uses `uv` for dependency management
 
 ## Notebooks Structure
 

@@ -24,9 +24,11 @@ class BinaryMetricsComputer:
     """Compute binary classification metrics for both PyTorch loops and HuggingFace Trainer."""
 
     threshold: float = 0.5
+    # TODO: should default to `torch.device("cpu")` here instead of in post init?
     device: Optional[torch.device] = None
 
     # Internal state - initialized in __post_init__
+    # TODO: is `accuracy` even a useful measure? seems misleading at best
     accuracy: BinaryAccuracy = field(init=False, repr=False)
     precision: BinaryPrecision = field(init=False, repr=False)
     recall: BinaryRecall = field(init=False, repr=False)

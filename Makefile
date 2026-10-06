@@ -14,9 +14,11 @@ bench: bootstrap
 		uv run opentelemetry-instrument python scripts/bench.py --batches 100 --batch-size 128; \
 	fi
 
+format:
+	uv run --group dev ruff format .
+
 check:
 	uv run --group dev ruff check .
 	uv run --group dev pyrefly check .
 
-format:
-	uv run --group dev ruff format .
+ci: format check
